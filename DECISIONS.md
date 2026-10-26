@@ -182,5 +182,5 @@ Judgement calls made during implementation, newest last.
   - Nowhere, docs included, may `*.local`/`*.lan`/`*.home`/`*.internal` names or private IPs appear.
   - There are no symlinks, and every `../` path in a file must resolve inside `Songbook/`.
   - The checker was itself checked with a planted file (a `.local` URL, a private IP, a `../` escape and an unlisted domain), and all four were flagged.
-- **The `app` stage is last in the Dockerfile**, so a plain `docker build .` gives the production image. Compose builds `target: app` and tags it `SONGBOOK_IMAGE` (default `songbook:latest`).
+- **The `app` stage comes right after `runtime`**, ahead of `test` and `e2e`. The classic builder (no BuildKit, as on the first deploy host) builds every stage before `--target`, so with `app` last a production build pulled Playwright and built the test image too. Always build with `--target`. Compose builds `target: app` and tags it `SONGBOOK_IMAGE` (default `songbook:latest`).
 - **Shell variables beat `.env` in Compose.** The first Gate 7 run "passed" PUID 1234 into `.env`, but the containers ran as 1000, because the calling shell (a linuxserver-style container) exports `PUID`/`PGID`. `compose_test.sh` now runs compose with every `.env.example` key unset, so `.env` is the only source. The README and `.env.example` warn about this precedence.
