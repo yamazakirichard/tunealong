@@ -1,0 +1,79 @@
+/*
+ * Adapted from gethomepage/homepage v2.7.0 (src/styles/globals.css and
+ * tailwind.config.js). Copyright (C) the Homepage contributors. GPL-3.0; see NOTICE.
+ * Changes: Tailwind config inlined as @theme/@custom-variant, Next.js and widget rules removed.
+ */
+@import "tailwindcss";
+@import "./theme.css";
+@plugin "@tailwindcss/forms";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --breakpoint-3xl: 112rem;
+  --color-theme-50: rgb(var(--color-50));
+  --color-theme-100: rgb(var(--color-100));
+  --color-theme-200: rgb(var(--color-200));
+  --color-theme-300: rgb(var(--color-300));
+  --color-theme-400: rgb(var(--color-400));
+  --color-theme-500: rgb(var(--color-500));
+  --color-theme-600: rgb(var(--color-600));
+  --color-theme-700: rgb(var(--color-700));
+  --color-theme-800: rgb(var(--color-800));
+  --color-theme-900: rgb(var(--color-900));
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: rgb(var(--bg-color));
+}
+
+html,
+body {
+  font-family: system-ui, "Segoe UI", Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.1px;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.light {
+  --bg-color: var(--color-50);
+  --scrollbar-thumb: rgb(var(--color-300));
+  --scrollbar-track: rgb(var(--color-200));
+}
+
+.dark {
+  --bg-color: var(--color-800);
+  --scrollbar-thumb: rgb(var(--color-600));
+  --scrollbar-track: rgb(var(--color-700));
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 0.25em;
+}
+
+/* Songbook */
+.player-video {
+  object-fit: contain;
+}

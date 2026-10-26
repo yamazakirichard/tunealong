@@ -74,7 +74,7 @@ def playback(conn, settings, song_id: int, preset) -> dict:
     out = {
         "preset_id": preset["id"] if preset else None,
         "source": "original",
-        "url": f"/media/originals/{song_id}",
+        "url": f"media/originals/{song_id}",
         "live_semitones": semitones,
         "live_tempo": tempo,
         "time_scale": 1.0,
@@ -92,7 +92,7 @@ def playback(conn, settings, song_id: int, preset) -> dict:
         return out
     row = render_row(conn, settings, song_id, key)
     if row is not None:
-        out.update(source="render", url=f"/media/renders/{row['id']}", live_semitones=0.0)
+        out.update(source="render", url=f"media/renders/{row['id']}", live_semitones=0.0)
         if bake:
             out.update(live_tempo=1.0, time_scale=round(1 / tempo, 6))
         return out

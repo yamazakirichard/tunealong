@@ -21,7 +21,7 @@ def preset_dict(row: sqlite3.Row) -> dict:
 def song_dict(row: sqlite3.Row, categories: list[int] | None = None,
               default_preset: dict | None = None) -> dict:
     d = {k: row[k] for k in SONG_FIELDS}
-    d["media_url"] = f"/media/originals/{row['id']}" if row["original_path"] and row["status"] == "ready" else None
+    d["media_url"] = f"media/originals/{row['id']}" if row["original_path"] and row["status"] == "ready" else None
     d["categories"] = categories or []
     d["default_preset"] = default_preset
     return d

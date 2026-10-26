@@ -6,9 +6,11 @@ a real HTTP server on 127.0.0.1 so the worker's sync client talks to it
 unchanged; nothing leaves the machine.
 """
 
+import json
 import os
 import shutil
 import socket
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -23,10 +25,13 @@ from songbook.youtube import parse_id
 
 
 class FakeMetube:
-    def __init__(self, originals: Path, fixture: Path, delay: float = 0.1):
+    def __init__(self, originals: Path, fixture: Path, delay: float = 0.1, info_json: bool = False,
+                 unique: bool = False):
         self.originals = originals
         self.fixture = fixture
         self.delay = delay
+        self.info_json = info_json  # also write <id>.info.json, as MeTube does with writeinfojson
+        self.unique = unique  # tag each copy with its ID, so no two downloads share a sha256
         self.calls: list[dict] = []
         self.fail_status: int | None = None  # answer /add with this HTTP status
         self.yt_error: str | None = None     # accept /add, then report a failed download
@@ -64,8 +69,15 @@ class FakeMetube:
         return JSONResponse({"status": "ok"})
 
     def _write(self, yid: str) -> None:
+        if self.info_json:
+            (self.originals / f"{yid}.info.json").write_text(
+                json.dumps({"id": yid, "title": f"YouTube title {yid}", "uploader": "Fake Uploader"}))
         tmp = self.originals / f"{yid}.webm.part"
-        shutil.copy(self.fixture, tmp)
+        if self.unique:
+            subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(self.fixture), "-c", "copy",
+                            "-metadata", f"comment={yid}", "-f", "webm", str(tmp)], check=True)
+        else:
+            shutil.copy(self.fixture, tmp)
         os.replace(tmp, self.originals / f"{yid}.webm")
 
 

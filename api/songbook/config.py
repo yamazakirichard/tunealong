@@ -15,6 +15,7 @@ class Settings:
     scan_interval_s: float = 300.0
     worker_idle_s: float = 1.0
     render_timeout_s: float = 3600.0
+    web_dir: Path | None = None
 
     @property
     def db_path(self) -> Path:
@@ -43,6 +44,7 @@ def load() -> Settings:
         scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),
         worker_idle_s=float(os.environ.get("SONGBOOK_WORKER_IDLE_S", "1")),
         render_timeout_s=float(os.environ.get("SONGBOOK_RENDER_TIMEOUT_S", "3600")),
+        web_dir=Path(os.environ["SONGBOOK_WEB_DIR"]) if os.environ.get("SONGBOOK_WEB_DIR") else None,
     )
 
 

@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 VENV  := api/.venv
 PY    := $(VENV)/bin/python
-DEV_ROOT ?= $(CURDIR)/data
+DEV_ROOT ?= $(CURDIR)/.dev-data
 PORT  ?= 8080
 
 .PHONY: test test-api test-docker test-web e2e fixtures dev build venv clean
@@ -28,18 +28,26 @@ test-docker:
 	docker build -q --target test -t songbook:test . >/dev/null
 	docker run --rm songbook:test
 
-# The web app arrives in Phase 6; until then these are no-ops.
-test-web:
-	@if [ -f web/package.json ]; then cd web && npm test; else echo "test-web: no web/ app yet (Phase 6)"; fi
+test-web: web/node_modules
+	cd web && npx vitest run
 
+web/node_modules: web/package-lock.json
+	cd web && npm ci --no-audit --no-fund
+	touch $@
+
+# Playwright in Docker (Chromium, Python, ffmpeg and rubberband in one image),
+# against scripts/dev_stack.py with the built UI and a fake MeTube.
 e2e:
-	@if [ -f e2e/package.json ]; then cd e2e && npx playwright test; else echo "e2e: no e2e suite yet (Phase 6)"; fi
+	docker build -q --target e2e -t songbook:e2e . >/dev/null
+	docker run --rm --ipc=host songbook:e2e
 
-dev: venv
-	SONGBOOK_ROOT=$(DEV_ROOT) $(VENV)/bin/uvicorn --factory songbook.main:create_app --reload --port $(PORT) --app-dir api
+# API + worker + fake MeTube + built UI over a scratch root seeded with the
+# webm fixtures (wiped on start). For the real thing, use docker compose.
+dev: venv fixtures build
+	$(PY) scripts/dev_stack.py --port $(PORT) --root $(DEV_ROOT)
 
-build:
-	@if [ -f web/package.json ]; then cd web && npm ci && npx vite build; else echo "build: no web/ app yet (Phase 6)"; fi
+build: web/node_modules
+	cd web && npm run build
 
 clean:
-	rm -rf $(VENV) fixtures/originals api/.pytest_cache
+	rm -rf $(VENV) fixtures/originals api/.pytest_cache web/node_modules web/dist e2e/node_modules

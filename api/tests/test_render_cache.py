@@ -131,7 +131,7 @@ def test_identity_preset_makes_no_job(client, conn, song, renders, kw):
     p = preset(client, song, **kw)
     assert p["cache_key"] is None and render_jobs(conn) == []
     pb = playback(client, p["id"])
-    assert pb["source"] == "original" and pb["url"] == f"/media/originals/{song}"
+    assert pb["source"] == "original" and pb["url"] == f"media/originals/{song}"
     assert pb["live_semitones"] == 0 and pb["live_tempo"] == kw.get("tempo", 1.0)
 
 
@@ -139,12 +139,12 @@ def test_pending_then_render(client, conn, song, worker, renders):
     p = preset(client, song, semitones=2, tempo=0.9)
     pb = playback(client, p["id"])
     assert (pb["source"], pb["url"], pb["live_semitones"], pb["live_tempo"]) == (
-        "pending", f"/media/originals/{song}", 2.0, 0.9)
+        "pending", f"media/originals/{song}", 2.0, 0.9)
     worker.run_until_idle()
     pb = playback(client, p["id"])
     rid = conn.execute("SELECT id FROM renders").fetchone()[0]
     assert (pb["source"], pb["url"], pb["live_semitones"], pb["live_tempo"], pb["time_scale"]) == (
-        "render", f"/media/renders/{rid}", 0.0, 0.9, 1.0)
+        "render", f"media/renders/{rid}", 0.0, 0.9, 1.0)
     assert client.get(pb["url"]).status_code == 200
 
 

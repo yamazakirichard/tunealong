@@ -102,3 +102,47 @@ Judgement calls made during implementation, newest last.
   - A row whose path resolves outside `renders/` is never deleted. Empty song dirs are removed.
   - Hourly scheduling from the worker is Phase 7.
 - **numpy is a dev dependency** for the FFT tests. Each test takes the middle 60% of the audio, applies a Hann window, and interpolates the FFT peak.
+
+## Phase 6
+
+- **Live pitch: `@soundtouchjs/audio-worklet` 2.1.1.** Its licence is **MPL-2.0, not LGPL**. MPL-2.0 is GPL-3.0-compatible (§3.3, no "Incompatible With Secondary Licenses" notice in the package), so it qualifies under the plan's "or another GPL-3.0-compatible licence".
+  - Its README documents `createMediaElementSource → SoundTouchNode`, and the node exposes a `pitchSemitones` AudioParam. The default `lanczos` interpolation is built into the processor bundle, which Vite emits via `?url`.
+  - The package recommends `preservesPitch = false` plus SoundTouch compensating for the rate. We use the plan's split instead: the browser keeps pitch at any `playbackRate` (`preservesPitch = true`), and SoundTouch shifts pitch only. Its 128-sample blocks then never have to stretch time.
+- **AudioWorklet needs a secure context** (HTTPS or localhost). Over plain HTTP on a LAN, the player falls back to playing the `<video>` directly and shows "live pitch unavailable". Cached renders still play shifted. The README in Phase 7 will say so.
+- **Live pitch and tempo are relative to what's loaded.** Worklet pitch = wanted semitones − semitones baked into the current source. `playbackRate` = wanted tempo ÷ baked tempo (if tempo is baked). So moving the controls while a render is loaded just works, with no source swap.
+- **Homepage fork: v2.7.0** (`2e5f1013`), recorded in NOTICE with every ported file. Each ported file has a header naming its upstream file and what changed.
+  - Ported: the services group, list and item components, `columnMap` (per-group columns and row/column style), the colour themes, light/dark mode with the colour toggle, and the globals.
+  - The quick-search bar follows quicklaunch's behaviour (type anywhere, Enter opens the top hit, Escape clears) as an always-visible field over the server-side search, not a modal with web search.
+  - Stripped: widgets, stats, pings, icons, config loading, Next.js and i18n.
+  - Tailwind v4 config is inlined in CSS (`@theme`, `@custom-variant dark`, `@plugin "@tailwindcss/forms"`). The Manrope webfont isn't bundled; a system font stack is used instead.
+- **Cards open the player.** The title area is a `<button>`; there's no `<a>` and no navigation. Cards that aren't ready are disabled, with the status or error as a tooltip.
+  - Every card shows the YouTube title and uploader as grey reference text, not only in Unsorted, because covers and re-uploads are hard to tell apart otherwise.
+  - Chips: "local", the download status, the default preset's name, and categories.
+- **"Inline edit" is an edit dialog** (title, artist with autocomplete, notes, categories with inline create), reached from each card's ⋯ menu. The menu items "Edit…", "Set artist…" and "Set categories…" focus the relevant field.
+  - Deleting asks whether to also delete the original file.
+  - Linking shows the 409 owner as a toast with an "Open" link.
+- **Drag and drop uses native HTML5 DnD**:
+  - A song dropped on a card goes before that card. If the card is in another artist group, the song also moves to that artist.
+  - A song dropped on a group goes to the end of that group.
+  - Group headers have a drag handle, and dropping one before another group reorders the groups.
+  - Keyboard and menu alternatives: "Move up/down" in the card menu, and "Move earlier/later" in the group settings.
+  - In category view, song drag is off, because `sort_order` is per song and grouping by category would make "the group" ambiguous. Category groups can still be reordered.
+- **Artist settings** (a gear on the group header): rename, columns (1–8), style (row/column), move earlier/later, delete. The category manager (toolbar) does create, rename, recolour (`<input type=color>`), reorder and delete.
+- **Toolbar**: search, Group by Artist/Category, a category filter, Add song, Categories, Rescan library, a job indicator (it polls `/api/jobs` and refreshes the library whenever the active count changes), and the colour and theme toggles. Group-by, the filter, theme and colour are remembered in `localStorage`, behind try/catch.
+- **Player**:
+  - Every open mounts a fresh `<video>` (React `key`) and builds a new AudioContext and graph. Close pauses, drops `src`, disconnects, closes the context, unlocks body scroll and restores focus.
+  - **No `<StrictMode>`**: its double-run of effects in development would call `createMediaElementSource` twice on one element.
+  - Save dialog: name, "Make this the default for this song" (unchecked for a new preset; for "Save preset" on an existing one it starts at that preset's current state, so a plain re-save doesn't silently drop the default), and "Bake tempo into the render (slow)", off by default.
+  - "Save preset" with no preset selected creates one. "Reset to original" goes back to 0 / 1.0× and the original file, and stores nothing.
+  - While a render is pending, the player polls `api/presets/{id}/playback` every second. When the render is ready, it swaps `src`, mapping the position by `time_scale`, and keeps playing.
+  - The loop is checked every frame with `requestVideoFrameCallback`, or `requestAnimationFrame` for audio-only media or when paused. Setting A/B divides the current time by `time_scale`, so loop points stay in original-timeline seconds.
+  - The controls auto-hide after 2 s without mouse movement (by opacity, not removal), and stay up while hovered or focused. F toggles fullscreen on the modal itself.
+  - Shortcuts are ignored while typing in a text field or select. Space on a focused button toggles play without also clicking the button.
+  - `window.__songbook` exposes read-only state (getters for live values) plus `graph`, `audioState` and `errors` (any `createMediaElementSource` failure) for Playwright.
+- **API URLs are relative** (`media/originals/1`, not `/media/…`), in the API's own responses too, and Vite builds with `base: './'`, so the UI works under any subpath. The API serves `web/dist` with `StaticFiles(html=True)` when `SONGBOOK_WEB_DIR` points at it. It's mounted after the API routes, so they win.
+- **`scripts/dev_stack.py`** runs the API, the worker thread, the fake MeTube and the built UI in one process over a scratch root seeded with the two webm fixtures. It backs both `make dev` and Playwright.
+  - The fake writes `.info.json` and tags each copy with its ID (an ffmpeg remux), so a fake download doesn't collide with a seeded fixture on `original_sha256`.
+  - Dev-only `POST /__dev/reset` and `GET /__dev/calls` are added to the API app by this script only.
+  - **The root is wiped on start and on every reset, so the script refuses any non-empty folder without its `.songbook-dev-root` marker.** `make dev` uses `.dev-data/` (gitignored), never `data/`.
+- **Where things run.** vitest and the Vite build run locally (code-server has Node 22) and also inside the Dockerfile's `web` stage. Playwright runs in the `e2e` stage: `mcr.microsoft.com/playwright:v1.64.1-noble` plus python3, ffmpeg and rubberband-cli, against `dev_stack.py`, one test at a time, with Chromium launched with `--autoplay-policy=no-user-gesture-required`.
+- **Pinned versions**: React 19.3.1, Vite 8.3.5, Tailwind 4.3.3, vitest 5.0.5, `@headlessui/react` 2.2.10, Playwright 1.64.1. TypeScript is held at 5.9.3, not the new 7.x.

@@ -4,6 +4,7 @@ nothing touches the filesystem at import time."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 
 from . import config, db
 from .routes import groups, library, media, presets, songs
@@ -31,5 +32,10 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
 
     for module in (songs, presets, groups, library, media):
         app.include_router(module.router)
+
+    # The built UI (web/dist), served last so the API routes win. The UI uses
+    # only relative URLs, so it works at / or under any subpath.
+    if settings.web_dir and (settings.web_dir / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")
 
     return app

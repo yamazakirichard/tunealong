@@ -52,7 +52,7 @@ def test_library_groups_and_orders(client, lib):
     assert [s["youtube_id"] for s in by["Unsorted"]["songs"]] == ["CCCCCCCCCCC"]
     assert by["Unsorted"]["id"] is None and by["beatles"]["songs"] == []
     s = by["AC/DC"]["songs"][0]
-    assert s["media_url"] == f"/media/originals/{lib['AAAAAAAAAAA']}" and s["default_preset"] is None
+    assert s["media_url"] == f"media/originals/{lib['AAAAAAAAAAA']}" and s["default_preset"] is None
 
 
 def test_library_includes_default_preset(client, lib):
@@ -185,7 +185,7 @@ def test_song_with_no_presets_plays_original_unshifted(client, lib):
     sid = lib["AAAAAAAAAAA"]
     r = client.get(f"/api/songs/{sid}/playback").json()
     assert (r["live_semitones"], r["live_tempo"], r["source"]) == (0.0, 1.0, "original")
-    assert r["url"] == f"/media/originals/{sid}" and r["preset_id"] is None
+    assert r["url"] == f"media/originals/{sid}" and r["preset_id"] is None
 
 
 def test_non_default_preset_doesnt_shift_playback(client, lib):

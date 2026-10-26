@@ -10,6 +10,27 @@ Third-party code
 ----------------
 
 gethomepage/homepage — https://github.com/gethomepage/homepage
+  Copyright (C) the Homepage contributors
   Licence: GPL-3.0
-  Upstream tag: (recorded in Phase 6, when components are ported)
-  Lifted files keep their original copyright notices.
+  Upstream tag: v2.7.0 (commit 2e5f10134ae3961bb936d3e7c441f9a1f4a4bf4f)
+  Ported or adapted, each with a header naming its upstream file:
+    web/src/styles/theme.css                    (src/styles/theme.css, unmodified)
+    web/src/styles/globals.css                  (src/styles/globals.css, tailwind.config.js)
+    web/src/lib/columns.ts                      (src/utils/layout/columns.js)
+    web/src/lib/theme.tsx                       (src/utils/contexts/theme.jsx, color.jsx)
+    web/src/components/services/group.tsx      (src/components/services/group.jsx)
+    web/src/components/services/list.tsx       (src/components/services/list.jsx)
+    web/src/components/services/item.tsx       (src/components/services/item.jsx)
+    web/src/components/toggles/theme.tsx       (src/components/toggles/theme.jsx)
+    web/src/components/toggles/color.tsx       (src/components/toggles/color.jsx)
+    web/src/components/quicksearch.tsx         (behaviour of src/components/quicklaunch.jsx)
+
+SoundTouchJS — https://github.com/cutterbl/SoundTouchJS
+  @soundtouchjs/audio-worklet 2.1.1 (and its @soundtouchjs/* dependencies),
+  used unmodified as an npm dependency for live pitch shifting.
+  Copyright (C) Steve 'Cutter' Blades and contributors
+  Licence: MPL-2.0 (GPL-3.0-compatible; no "Incompatible With Secondary
+  Licenses" notice). Source: the repository above.
+
+Runtime tools (not distributed in this repository; installed in the image):
+  Rubber Band Library / rubberband-cli (GPL-2.0-or-later), FFmpeg (LGPL/GPL).
