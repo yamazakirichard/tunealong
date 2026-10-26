@@ -51,6 +51,16 @@ describe("shortcut reducer", () => {
     expect(r.state).toEqual(base);
   });
 
+  it.each([
+    ["ArrowLeft", { seekBy: -5 }],
+    ["ArrowRight", { seekBy: 5 }],
+    ["Home", { seekTo: 0 }],
+  ])("%s seeks: %j", (key, effect) => {
+    const r = apply(key);
+    expect(r.effect).toEqual(effect);
+    expect(r.state).toEqual(base);
+  });
+
   it("ignores other keys", () => {
     expect(shortcut(base, "x")).toBeNull();
     expect(shortcut(base, "Enter")).toBeNull();

@@ -79,7 +79,7 @@ test("+2 saved as default: rendering… → cached, src switches to the render, 
   await openSong(page, A);
   await page.getByRole("button", { name: "Pitch up 1" }).click();
   await page.getByRole("button", { name: "Pitch up 1" }).click();
-  await saveAs(page, "Up two", true);
+  await saveAs(page, "Up two");
   const badge = page.getByTestId("render-badge");
   await expect(badge).toHaveText("rendering…");
   await expect.poll(async () => (await sb(page)).pitch).toBe(2); // live while pending
@@ -99,26 +99,74 @@ test("+2 saved as default: rendering… → cached, src switches to the render, 
   expect(await jobs(request, "render")).toHaveLength(1);
 });
 
-test("+2 saved without 'make default' renders, but the song still opens at 0", async ({ page, request }) => {
+test("the most recently saved preset is what the song opens with; 'Open at original' undoes that", async ({ page, request }) => {
   await page.goto("./");
+  const id = await songId(request, A);
   await openSong(page, A);
   await page.getByRole("button", { name: "Pitch up 1" }).click();
   await page.getByRole("button", { name: "Pitch up 1" }).click();
-  await saveAs(page, "Practice", false);
+  await saveAs(page, "Up two");
   await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 30_000 });
-  const id = await songId(request, A);
+  await page.getByRole("button", { name: "Pitch down 1" }).click();
+  await page.getByRole("button", { name: "Pitch down 1" }).click();
+  await page.getByRole("button", { name: "Pitch down 1" }).click();
+  await saveAs(page, "Down one");
+  await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 30_000 });
   const ps = await presets(request, id);
-  expect(ps).toHaveLength(1);
-  expect(ps[0]).toMatchObject({ name: "Practice", semitones: 2, is_default: false });
+  expect(ps.map((p: { name: string; is_default: boolean }) => [p.name, p.is_default])).toEqual([
+    ["Down one", true],
+    ["Up two", false],
+  ]);
   await closePlayer(page);
 
   await openSong(page, A);
+  await expect(page.getByTestId("preset-badge")).toHaveText("Down one");
+  await expect(page.getByTestId("render-badge")).toHaveText("cached");
+  expect((await sb(page)).semitones).toBe(-1);
+
+  // Re-saving an older preset makes it the default again.
+  await page.getByLabel("Preset", { exact: true }).selectOption({ label: "Up two" });
+  await page.getByRole("button", { name: "Save preset" }).click();
+  await page.getByRole("dialog", { name: "Save preset" }).getByRole("button", { name: "Save" }).click();
+  await expect.poll(async () => (await presets(request, id)).find((p: { is_default: boolean }) => p.is_default)?.name).toBe("Up two");
+
+  await page.getByRole("button", { name: "Open at original" }).click();
+  await expect.poll(async () => (await presets(request, id)).some((p: { is_default: boolean }) => p.is_default)).toBe(false);
+  await closePlayer(page);
+  await openSong(page, A);
   const s = await sb(page);
-  expect(s.pitch).toBe(0);
-  expect(s.playbackRate).toBe(1);
-  expect(s.badge).toBe("original");
-  expect(s.presetName).toBeNull();
+  expect([s.pitch, s.playbackRate, s.badge, s.presetName]).toEqual([0, 1, "original", null]);
   expect(s.src).toContain(`/media/originals/${id}`);
+});
+
+test("the seek bar shows the position and jumps through the track", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await expect(page.getByTestId("length")).toHaveText("0:10");
+  const seek = page.getByLabel("Position", { exact: true });
+  await seek.fill("6");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThanOrEqual(6);
+  await expect(page.getByTestId("position")).toHaveText(/0:0[67]/);
+  // Arrow keys jump 5 s, Home goes back to the start.
+  await page.getByTestId("player").focus();
+  await page.keyboard.press("Home");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeLessThan(1);
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThanOrEqual(5);
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeLessThan(2);
+});
+
+test("on a slowed-down render the seek bar still uses the song's own timeline", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await page.getByLabel("Tempo", { exact: true }).fill("0.5");
+  await saveAs(page, "Half");
+  await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 30_000 });
+  await expect(page.getByTestId("length")).toHaveText("0:10"); // the song is 10 s, the file 20 s
+  await page.getByLabel("Position", { exact: true }).fill("4");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThanOrEqual(8); // 4 s of song = 8 s of render
+  expect((await sb(page)).position).toBeGreaterThanOrEqual(4);
 });
 
 test("F toggles fullscreen on the modal, not a new tab", async ({ page, context }) => {
@@ -167,7 +215,7 @@ test("a saved tempo is rendered by Rubber Band: the render plays at rate 1, time
   await openSong(page, A);
   await page.getByLabel("Tempo", { exact: true }).fill("0.75");
   await expect.poll(async () => (await sb(page)).playbackRate).toBe(0.75); // live preview first
-  await saveAs(page, "Slow", true);
+  await saveAs(page, "Slow");
   await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 30_000 });
   await expect.poll(async () => (await sb(page)).src).toContain("/media/renders/");
   let s = await sb(page);

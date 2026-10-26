@@ -194,3 +194,11 @@ Judgement calls made during implementation, newest last.
   - Tempo-only presets (0 semitones) now render too, so a slowed-down song is Rubber Band quality rather than the browser's time-stretch.
   - The live controls remain a preview (SoundTouch pitch, browser tempo) until the render is ready. Then the player switches to the render at `playbackRate` 1, mapping the position by `time_scale`.
   - The cost: each distinct pitch-and-tempo pair is its own render, so the cache grows faster. GC still caps it at `SONGBOOK_CACHE_MAX_GB`.
+- **Seek bar** (owner's request, 2026-10-26): a full-width position slider is the first row of the player controls, with `m:ss` position and length, and markers for A/B.
+  - Position and length are on the **original timeline**, like loop points, so a spot in the song has the same time whichever render is playing. A half-tempo render of a 10 s song shows 0:10.
+  - Dragging scrubs, seeking as it moves. The display updates on `timeupdate` (about 4 Hz), which is enough for a clock and avoids re-rendering the player every frame.
+  - Keys: ← and → jump 5 s, and Home goes to the start. These are added to the tested shortcut reducer. They're ignored while a slider (position or tempo) has focus, so its own arrow keys still work.
+- **The most recently saved preset becomes the song's default** (owner's request, 2026-10-26). This supersedes the plan's "Make this the default" checkbox, unchecked by default.
+  - Both "Save preset" and "Save as…" send `is_default: true`, and the API's existing one-default rule clears the previous one. The checkbox is gone.
+  - So the song never gets stuck opening shifted, an **"Open at original"** button appears next to the preset selector whenever the song has a default. It clears the default (`is_default: false`) and stores nothing else.
+  - The API itself still defaults `is_default` to false for other clients.

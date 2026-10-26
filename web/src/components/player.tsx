@@ -68,6 +68,10 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [controlsVisible, setControlsVisible] = useState(true);
   const [saveMode, setSaveMode] = useState<"save" | "save-as" | null>(null);
   const [graphKind, setGraphKind] = useState<"worklet" | "direct" | "none">("none");
+  // Position and length on the ORIGINAL timeline (like loop points), so 1:30 is
+  // the same spot in the song whichever render is playing.
+  const [position, setPosition] = useState(0);
+  const [length, setLength] = useState(0);
 
   // Latest values for callbacks that outlive a render (rAF loop, key handler).
   const live = useRef({ semitones, tempo, loopA, loopB, loopOn, loaded, saveMode });
@@ -284,9 +288,42 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     }
   };
 
+  /** Jump to `t` seconds on the original timeline. */
+  const seekTo = (t: number) => {
+    const v = videoRef.current;
+    const l = live.current.loaded;
+    if (!v || !l) return;
+    const end = Number.isFinite(v.duration) ? v.duration / l.timeScale : t;
+    const clamped = Math.min(Math.max(0, t), Math.max(0, end - 0.05));
+    v.currentTime = clamped * l.timeScale;
+    setPosition(clamped);
+  };
+  const syncTime = () => {
+    const v = videoRef.current;
+    const scale = live.current.loaded?.timeScale ?? 1;
+    if (!v) return;
+    setPosition(v.currentTime / scale);
+    if (Number.isFinite(v.duration)) setLength(v.duration / scale);
+  };
+
+  /** Stop the song opening shifted: no preset is the default any more. */
+  const openAtOriginal = async () => {
+    const d = presets.find((p) => p.is_default);
+    if (!d) return;
+    try {
+      await api.patchPreset(d.id, { is_default: false });
+      setPresets((await api.song(song.id)).presets ?? []);
+      toast({ text: "This song will open at its original pitch and tempo" });
+      void lib.refresh();
+    } catch (e) {
+      toast({ text: errorText(e), kind: "error" });
+    }
+  };
+
   // Saving renders pitch AND tempo with Rubber Band; until that's ready the
-  // live preview (SoundTouch pitch, browser tempo) keeps playing.
-  const save = async (name: string, makeDefault: boolean) => {
+  // live preview (SoundTouch pitch, browser tempo) keeps playing. The most
+  // recently saved preset becomes the song's default.
+  const save = async (name: string) => {
     const body = {
       name,
       semitones,
@@ -294,7 +331,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       bake_tempo: true,
       loop_a: loopA,
       loop_b: loopB,
-      is_default: makeDefault,
+      is_default: true,
     };
     try {
       const saved =
@@ -342,6 +379,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       }
       const t = e.target as HTMLElement;
       if (t.matches("input[type=text], input[type=search], textarea, select") || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (t.matches("input[type=range]") && (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End")) return;
       const { semitones: s, tempo: tp, loopOn: on } = live.current;
       const r = shortcut({ semitones: s, tempo: tp, loopOn: on }, e.key);
       if (!r) return;
@@ -354,6 +392,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       if (r.effect === "set-a") setA();
       if (r.effect === "set-b") setB();
       if (r.effect === "fullscreen") toggleFullscreen();
+      if (r.effect && typeof r.effect === "object") {
+        const v = videoRef.current;
+        const scale = live.current.loaded?.timeScale ?? 1;
+        if (v) seekTo("seekTo" in r.effect ? r.effect.seekTo : v.currentTime / scale + r.effect.seekBy);
+      }
     };
     document.addEventListener("keydown", onKey);
     const onFs = () => setFullscreen(document.fullscreenElement === modalRef.current);
@@ -408,6 +451,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       badge,
       presetName: preset?.name ?? null,
       time_scale: loaded?.timeScale ?? 1,
+      position,
+      length,
       loop_a: loopA,
       loop_b: loopB,
       loopOn,
@@ -449,6 +494,10 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           autoPlay
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
+          onTimeUpdate={syncTime}
+          onLoadedMetadata={syncTime}
+          onDurationChange={syncTime}
+          onSeeked={syncTime}
           onClick={togglePlay}
         />
 
@@ -492,6 +541,38 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           )}
           data-testid="player-controls"
         >
+          <div className="basis-full flex items-center gap-3">
+            <span className="tabular-nums text-xs w-12 text-right" data-testid="position">{clock(position)}</span>
+            <div className="relative flex-1 flex items-center">
+              <input
+                type="range"
+                aria-label="Position"
+                data-testid="seek"
+                min={0}
+                max={length || 0}
+                step={0.1}
+                value={Math.min(position, length || 0)}
+                onChange={(e) => seekTo(Number(e.target.value))}
+                disabled={!length}
+                className="w-full accent-theme-400"
+              />
+              {length > 0 &&
+                [loopA, loopB].map((m, i) =>
+                  m === null ? null : (
+                    <span
+                      key={i}
+                      aria-hidden
+                      className={classNames(
+                        "pointer-events-none absolute top-1/2 -translate-y-1/2 h-4 w-0.5",
+                        loopOn ? "bg-amber-400" : "bg-white/50",
+                      )}
+                      style={{ left: `${(m / length) * 100}%` }}
+                    />
+                  ),
+                )}
+            </div>
+            <span className="tabular-nums text-xs w-12" data-testid="length">{clock(length)}</span>
+          </div>
           <button type="button" className={ctl} onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <MdPause /> : <MdPlayArrow />}
           </button>
@@ -513,6 +594,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
               ))}
             </select>
           </label>
+          {presets.some((p) => p.is_default) && (
+            <button type="button" className={ctl} onClick={openAtOriginal} title="Stop opening this song with a preset">
+              Open at original
+            </button>
+          )}
 
           <div className="flex items-center gap-1" role="group" aria-label="Pitch">
             <span>Pitch</span>
@@ -575,7 +661,6 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         {saveMode && (
           <SaveDialog
             initialName={saveMode === "save" && preset ? preset.name : ""}
-            initialDefault={saveMode === "save" && preset ? preset.is_default : false}
             onCancel={() => setSaveMode(null)}
             onSave={save}
           />
@@ -585,17 +670,15 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   );
 }
 
-function SaveDialog({ initialName, initialDefault, onCancel, onSave }: {
+function SaveDialog({ initialName, onCancel, onSave }: {
   initialName: string;
-  initialDefault: boolean;
   onCancel: () => void;
-  onSave: (name: string, makeDefault: boolean) => void;
+  onSave: (name: string) => void;
 }) {
   const [name, setName] = useState(initialName);
-  const [makeDefault, setMakeDefault] = useState(initialDefault);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (name.trim()) onSave(name.trim(), makeDefault);
+    if (name.trim()) onSave(name.trim());
   };
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onKeyDown={(e) => e.key === "Escape" && onCancel()}>
@@ -610,11 +693,7 @@ function SaveDialog({ initialName, initialDefault, onCancel, onSave }: {
           Name
           <input autoFocus name="preset-name" type="text" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <label className="text-sm flex items-center gap-2">
-          <input type="checkbox" name="make-default" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
-          Make this the default for this song
-        </label>
-        <p className="text-xs text-theme-500">Pitch and tempo are rendered with Rubber Band, cached for next time.</p>
+        <p className="text-xs text-theme-500">Pitch and tempo are rendered with Rubber Band and cached. The song opens with its most recently saved preset.</p>
         <div className="flex justify-end gap-2">
           <button type="button" className={plainButtonClass} onClick={onCancel}>Cancel</button>
           <button type="submit" className={buttonClass} disabled={!name.trim()}>Save</button>
@@ -622,4 +701,11 @@ function SaveDialog({ initialName, initialDefault, onCancel, onSave }: {
       </form>
     </div>
   );
+}
+
+function clock(t: number): string {
+  if (!Number.isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60);
+  const sec = Math.floor(t % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
 }

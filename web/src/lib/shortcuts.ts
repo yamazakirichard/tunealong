@@ -5,6 +5,7 @@ export const TEMPO_MAX = 2.0;
 export const TEMPO_STEP = 0.05;
 export const PITCH_MIN = -12;
 export const PITCH_MAX = 12;
+export const SEEK_STEP = 5; // seconds, on the original timeline
 
 export interface Controls {
   semitones: number;
@@ -12,7 +13,14 @@ export interface Controls {
   loopOn: boolean;
 }
 
-export type Effect = "toggle-play" | "set-a" | "set-b" | "fullscreen" | null;
+export type Effect =
+  | "toggle-play"
+  | "set-a"
+  | "set-b"
+  | "fullscreen"
+  | { seekBy: number }
+  | { seekTo: number }
+  | null;
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 export const clampTempo = (t: number) => round2(Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, t)));
@@ -43,6 +51,12 @@ export function shortcut(state: Controls, key: string): { state: Controls; effec
     case "f":
     case "F":
       return { state, effect: "fullscreen" };
+    case "ArrowLeft":
+      return { state, effect: { seekBy: -SEEK_STEP } };
+    case "ArrowRight":
+      return { state, effect: { seekBy: SEEK_STEP } };
+    case "Home":
+      return { state, effect: { seekTo: 0 } };
     default:
       return null;
   }
