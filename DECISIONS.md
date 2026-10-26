@@ -184,3 +184,7 @@ Judgement calls made during implementation, newest last.
   - The checker was itself checked with a planted file (a `.local` URL, a private IP, a `../` escape and an unlisted domain), and all four were flagged.
 - **The `app` stage comes right after `runtime`**, ahead of `test` and `e2e`. The classic builder (no BuildKit, as on the first deploy host) builds every stage before `--target`, so with `app` last a production build pulled Playwright and built the test image too. Always build with `--target`. Compose builds `target: app` and tags it `SONGBOOK_IMAGE` (default `songbook:latest`).
 - **Shell variables beat `.env` in Compose.** The first Gate 7 run "passed" PUID 1234 into `.env`, but the containers ran as 1000, because the calling shell (a linuxserver-style container) exports `PUID`/`PGID`. `compose_test.sh` now runs compose with every `.env.example` key unset, so `.env` is the only source. The README and `.env.example` warn about this precedence.
+
+## After Phase 7
+
+- **The definition of done's legacy-import review was waived by the owner** ("No import needed", 2026-10-26). The dry run against the real MeTube folder was shown in Phase 2. The importer stays available (`python -m songbook.import_legacy`) but hasn't been run on real data.
