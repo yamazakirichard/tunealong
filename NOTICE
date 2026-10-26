@@ -1,0 +1,15 @@
+Songbook
+Copyright (C) 2026 Songbook contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See LICENSE.
+
+Third-party code
+----------------
+
+gethomepage/homepage — https://github.com/gethomepage/homepage
+  Licence: GPL-3.0
+  Upstream tag: (recorded in Phase 6, when components are ported)
+  Lifted files keep their original copyright notices.

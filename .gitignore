@@ -1,0 +1,19 @@
+# generated test media (make fixtures); fixtures/cache_keys.json stays tracked
+fixtures/originals/
+fixtures/legacy/
+
+# runtime data
+data/
+.env
+
+# python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# node
+node_modules/
+web/dist/
+e2e/test-results/
+e2e/playwright-report/
