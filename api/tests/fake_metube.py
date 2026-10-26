@@ -107,3 +107,21 @@ class Server:
     def __exit__(self, *exc):
         self.server.should_exit = True
         self.thread.join(5)
+
+
+def main() -> None:
+    """Serve the fake on its own, for compose.fake-metube.yml: python -m tests.fake_metube"""
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--originals", type=Path, default=Path("/downloads"))
+    ap.add_argument("--fixture", type=Path, default=Path(__file__).resolve().parents[2] / "fixtures" / "originals" / "AAAAAAAAAAA.webm")
+    ap.add_argument("--host", default="0.0.0.0")
+    ap.add_argument("--port", type=int, default=8081)
+    args = ap.parse_args()
+    fake = FakeMetube(args.originals, args.fixture, delay=0.5, info_json=True, unique=True)
+    uvicorn.run(fake.app, host=args.host, port=args.port, log_level="warning")
+
+
+if __name__ == "__main__":
+    main()

@@ -5,6 +5,7 @@ fixtures/legacy/
 # runtime data
 data/
 .dev-data/
+.compose-test/
 .env
 
 # python

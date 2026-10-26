@@ -7,9 +7,10 @@ orphaned by a crash and goes back to `pending`.
 import json
 import logging
 import sqlite3
+import threading
 import time
 
-from . import config, db, ingest, jobs, render
+from . import cache, config, db, ingest, jobs, render
 from .media import YT_NAME_RE
 from .metube import MetubeClient
 
@@ -29,6 +30,7 @@ class Worker:
         self.metube = metube or MetubeClient(settings.metube_url)
         self.conn = conn or db.open_db(settings.db_path, settings.busy_timeout_ms)
         self._next_scan = 0.0
+        self._next_gc = 0.0
 
     def startup(self) -> None:
         with db.transaction(self.conn):
@@ -74,11 +76,43 @@ class Worker:
 
     def run_forever(self) -> None:
         self.startup()
+        if self.settings.heartbeat_path:
+            # A thread, so a long render doesn't look like a dead worker.
+            threading.Thread(target=self._beat_forever, daemon=True, name="heartbeat").start()
         while True:
-            if time.monotonic() >= self._next_scan:
+            now = time.monotonic()
+            if now >= self._next_scan:
                 self.enqueue_scan()
+            if now >= self._next_gc:
+                self.maybe_gc()
             if not self.run_once():
                 time.sleep(self.settings.worker_idle_s)
+
+    def _beat_forever(self) -> None:
+        while True:
+            self.beat()
+            time.sleep(15)
+
+    def beat(self) -> None:
+        """Touch the heartbeat file the container healthcheck reads."""
+        if self.settings.heartbeat_path:
+            try:
+                self.settings.heartbeat_path.touch()
+            except OSError as e:
+                log.warning("heartbeat: %s", e)
+
+    def maybe_gc(self) -> None:
+        """Evict renders over SONGBOOK_CACHE_MAX_GB. Runs between jobs, so never mid-render."""
+        self._next_gc = time.monotonic() + self.settings.gc_interval_s
+        if self.settings.cache_max_gb is None:
+            return
+        try:
+            removed = cache.gc(self.conn, self.settings, int(self.settings.cache_max_gb * 1024 ** 3))
+        except Exception:
+            log.exception("cache gc failed")
+            return
+        if removed:
+            log.info("cache gc removed %d file(s)", len(removed))
 
     def _download(self, yid: str) -> None:
         if self._file_for(yid) is None:

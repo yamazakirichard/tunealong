@@ -6,6 +6,7 @@ t1.000 and presets that differ only in live tempo share one render.
 """
 
 import shutil
+import time
 
 from . import jobs
 
@@ -119,12 +120,17 @@ def gc(conn, settings, max_bytes: int) -> list[str]:
     renders_dir = settings.renders_dir.resolve()
     removed: list[str] = []
     known = {(settings.root / r[0]).resolve() for r in conn.execute("SELECT path FROM renders")}
+    # A render in progress writes hidden temp files with no row yet; leave young ones alone.
+    stale = time.time() - max(settings.render_timeout_s, 3600) * 2
+    in_flight = lambda p: p.name.startswith(".") and p.stat().st_mtime > stale  # noqa: E731
+    for d in sorted(renders_dir.glob("*/.*.work")):
+        if not in_flight(d):
+            shutil.rmtree(d, ignore_errors=True)
     for p in sorted(renders_dir.rglob("*")):
-        if p.is_file() and p.resolve() not in known:
+        if p.is_file() and p.resolve() not in known and p.exists() and not in_flight(p) \
+                and not any(part.endswith(".work") for part in p.relative_to(renders_dir).parts):
             p.unlink(missing_ok=True)
             removed.append(str(p.relative_to(settings.root)))
-    for d in sorted(renders_dir.glob("*/.*.work")):
-        shutil.rmtree(d, ignore_errors=True)
     rows = conn.execute(
         "SELECT r.*, NOT EXISTS (SELECT 1 FROM presets p WHERE p.song_id = r.song_id"
         "   AND p.cache_key = r.cache_key) AS unreferenced"

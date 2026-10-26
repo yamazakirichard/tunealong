@@ -5,7 +5,7 @@ PY    := $(VENV)/bin/python
 DEV_ROOT ?= $(CURDIR)/.dev-data
 PORT  ?= 8080
 
-.PHONY: test test-api test-docker test-web e2e fixtures dev build venv clean
+.PHONY: test test-api test-docker test-web e2e compose-test fixtures dev build venv clean
 
 test: test-api test-web
 
@@ -40,6 +40,10 @@ web/node_modules: web/package-lock.json
 e2e:
 	docker build -q --target e2e -t songbook:e2e . >/dev/null
 	docker run --rm --ipc=host songbook:e2e
+
+# Gate 7: the compose deployment end to end (needs host port 8080 free).
+compose-test:
+	./scripts/compose_test.sh
 
 # API + worker + fake MeTube + built UI over a scratch root seeded with the
 # webm fixtures (wiped on start). For the real thing, use docker compose.

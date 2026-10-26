@@ -1,32 +1,179 @@
 # Songbook
 
-A self-hosted library for playing along to songs downloaded from YouTube. You
-can change pitch and tempo per song and save the settings as presets.
+A self-hosted library for playing along to songs downloaded from YouTube.
 
-Work in progress: see [plan/songbook-PLAN.md](plan/songbook-PLAN.md).
+- Your songs appear in a grid grouped by artist (or by your own categories),
+  in a style forked from [Homepage](https://github.com/gethomepage/homepage).
+- Click a song and it plays in a near-full-screen player. Close it with ✕ or Esc.
+- Change pitch (semitones) and tempo, and save the settings as named presets.
+  Only the presets you mark as default change how a song opens.
+- Saved pitch changes are rendered once with Rubber Band and cached, so the
+  next time it plays instantly at full quality.
+- Paste a YouTube URL to add a song. The same video is never downloaded twice.
+
+It runs as three containers: `api` (web UI and API on one port), `worker`
+(downloads, renders, library scans) and a bundled
+[MeTube](https://github.com/alexta69/metube).
+
+## Quick start
+
+```sh
+cp .env.example .env      # adjust PUID/PGID to your user (`id -u`, `id -g`)
+docker compose up -d
+```
+
+Open <http://localhost:8080>. The first `up` builds the image, which takes a
+few minutes. Everything is stored in `./data` (set `SONGBOOK_DATA` to change
+it):
+
+```
+data/
+├── songbook.sqlite        the library: songs, artists, categories, presets
+├── originals/             downloaded and imported media (MeTube writes here)
+├── renders/               pitch/tempo renders: a disposable cache
+└── metube-state/          MeTube's queue
+```
+
+All settings are environment variables, documented in
+[.env.example](.env.example). Note that variables already set in your shell
+win over `.env` (that's how Compose works). If `PUID`/`PGID` are exported in
+your environment, they're the ones used.
+
+> **Live pitch needs HTTPS (or localhost).** The player shifts pitch live with
+> a Web Audio worklet, which browsers only allow in a secure context. On plain
+> `http://<server-ip>:8080` the player still works, but it shows "live pitch
+> unavailable": saved presets play shifted from their cached renders, and only
+> tempo changes live. Put Songbook behind HTTPS (see below) to get live pitch
+> from other devices.
+
+## Importing your existing MeTube downloads
+
+If you already have a folder of MeTube downloads with arbitrary names
+(`Artist - Title [id].webm`, `Some title.mp4`, …), import them once:
+
+```sh
+# 1. See what would happen. Nothing is changed:
+docker compose run --rm -v /path/to/old/downloads:/import:ro api \
+  python -m songbook.import_legacy /import --dry-run
+
+# 2. Then for real:
+docker compose run --rm -v /path/to/old/downloads:/import:ro api \
+  python -m songbook.import_legacy /import
+```
+
+- A file with an `[id]` suffix becomes a YouTube song, so adding that URL later
+  is recognised as a duplicate. Anything else becomes a "local" song, which you
+  can link to a YouTube URL later from its menu.
+- The artist and title are guessed from `Artist - Title`. Check the dry run:
+  names like `Song - Artist - Lesson` guess wrong. You can fix them in the UI
+  afterwards, or rename the files first.
+- When the same title exists as both audio and video, only the video is
+  imported. Files already in the library are skipped.
+- Supported: webm, mp4, mkv, mp3, m4a. Source files are never moved or
+  deleted: they are hardlinked when on the same filesystem, otherwise copied.
+
+## Backups
+
+Back up `data/originals/` and `data/songbook.sqlite`. **Leave out
+`data/renders/`**: it's a cache that rebuilds itself as songs are played.
+For a consistent copy of the database while the app is running, use
+`sqlite3 data/songbook.sqlite ".backup songbook-backup.sqlite"`.
+
+The render cache is kept under `SONGBOOK_CACHE_MAX_GB` (default 20). The worker
+checks every hour and removes the least-used renders first.
+
+## Optional built-in login
+
+Off by default: leave it off if your reverse proxy or SSO already handles
+login. To turn on HTTP Basic auth for everything except `/api/health`:
+
+```sh
+docker compose run --rm api python -c \
+  "import bcrypt,getpass; print(bcrypt.hashpw(getpass.getpass().encode(), bcrypt.gensalt()).decode())"
+```
+
+Put the hash in `.env` with **every `$` doubled**, or Compose will mangle it:
+
+```
+SONGBOOK_AUTH_USER=me
+SONGBOOK_AUTH_PASSWORD_HASH=$$2b$$12$$…
+```
+
+## Running behind a reverse proxy
+
+Songbook serves everything (UI, API, media) on one port, so any reverse proxy
+works. A few things matter:
+
+- **Forward the `Range` header and don't buffer media responses.** Seeking in
+  the player relies on HTTP range requests.
+- **Subpath:** to serve under `https://example.com/songbook/`, set
+  `SONGBOOK_BASE_PATH=/songbook` and have the proxy pass the path through
+  unchanged. No rebuild is needed.
+- Set `SONGBOOK_BIND=127.0.0.1` if the proxy runs on the same host, so port
+  8080 isn't reachable directly.
+
+One-line examples, for a root domain:
+
+```
+# Caddy
+songbook.example.com { reverse_proxy localhost:8080 }
+
+# nginx (inside a server block)
+location / { proxy_pass http://127.0.0.1:8080; proxy_buffering off; proxy_set_header Range $http_range; proxy_set_header If-Range $http_if_range; }
+
+# Traefik (labels on the api service)
+traefik.http.routers.songbook.rule=Host(`songbook.example.com`)
+```
+
+## Using an existing MeTube
+
+To use a MeTube you already run instead of the bundled one:
+
+1. Set `METUBE_URL` in `.env` to its address, as reachable from the worker
+   container (for example `http://metube:8081` on a shared Docker network).
+2. Mount the same download folder as Songbook's `originals/`: MeTube's
+   download directory and `SONGBOOK_DATA/originals` must be the same place.
+3. Configure that MeTube with:
+   ```
+   OUTPUT_TEMPLATE=%(id)s.%(ext)s
+   YTDL_OPTIONS={"writeinfojson": true, "merge_output_format": "mp4"}
+   ```
+   **Don't enable `download_archive`.** Songbook does its own dedup, and an
+   archive would silently block re-downloading a song you deleted.
+4. Remove or scale down the bundled `metube` service, for example with
+   `docker compose up -d api worker`.
+
+To also use the bundled MeTube's own web UI, add `-f compose.yml -f
+compose.metube-ui.yml`, which publishes it on `127.0.0.1:8081`.
 
 ## Development
 
 Run everything from this directory.
 
 ```sh
-make fixtures     # generate test media with ffmpeg
-make test         # backend (pytest) + frontend (vitest) tests
-make test-docker  # backend suite in Docker, with real ffmpeg + rubberband
-make e2e          # Playwright (Chromium) in Docker against the dev stack
-make dev          # API + worker + fake MeTube + built UI on :8080, scratch data in .dev-data/
+make fixtures      # generate test media with ffmpeg
+make test          # backend (pytest) + frontend (vitest)
+make test-docker   # backend suite in Docker, with real ffmpeg + rubberband
+make e2e           # Playwright (Chromium) in Docker against the dev stack
+make compose-test  # the compose deployment end to end (needs port 8080 free)
+make dev           # API + worker + fake MeTube + built UI on :8080, scratch data in .dev-data/
 ```
 
 Needs Python 3.12, ffmpeg (with libvpx-vp9, libopus, libx264), Node 22 and
-Docker. rubberband-cli is only needed outside Docker.
+Docker. rubberband-cli is only needed outside Docker. No test touches the
+network: downloads go to a fake MeTube.
+
+Design decisions are recorded in [DECISIONS.md](DECISIONS.md), and the
+original plan is in [plan/songbook-PLAN.md](plan/songbook-PLAN.md).
 
 ## Credits
 
 The visual style is forked from
 [gethomepage/homepage](https://github.com/gethomepage/homepage) v2.7.0
 (GPL-3.0). Live pitch shifting uses
-[SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (MPL-2.0). See
-[NOTICE](NOTICE).
+[SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (MPL-2.0). Offline
+renders use [Rubber Band](https://breakfastquay.com/rubberband/) and
+[FFmpeg](https://ffmpeg.org/). See [NOTICE](NOTICE).
 
 ## Licence
 

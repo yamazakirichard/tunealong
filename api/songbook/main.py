@@ -5,14 +5,39 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from starlette.applications import Starlette
+from starlette.responses import RedirectResponse
+from starlette.routing import Mount, Route
 
 from . import config, db
+from .auth import BasicAuth
 from .routes import groups, library, media, presets, songs
 
 
-def create_app(settings: config.Settings | None = None) -> FastAPI:
+def create_app(settings: config.Settings | None = None):
     settings = settings or config.load()
+    app = _build(settings)
+    outer = app
+    if settings.base_path:
+        # SONGBOOK_BASE_PATH is read at runtime: the same image (and the same
+        # relative-URL UI build) serves at / or under a subpath.
+        base = settings.base_path
 
+        async def to_base(request):
+            return RedirectResponse(f"{base}/", status_code=308)
+
+        outer = Starlette(
+            routes=[Route(base, to_base), Mount(base, app=app)],
+            lifespan=lambda _: app.router.lifespan_context(app),  # mounted apps don't get lifespan events
+        )
+        outer.state.settings = settings
+    if settings.auth_enabled:
+        return BasicAuth(outer, settings.auth_user, settings.auth_password_hash,
+                         open_paths=(f"{settings.base_path}/api/health",))
+    return outer
+
+
+def _build(settings: config.Settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         config.ensure_dirs(settings)

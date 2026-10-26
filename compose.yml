@@ -1,0 +1,77 @@
+# Songbook: `cp .env.example .env && docker compose up -d`, then open http://localhost:8080
+# Every setting is an environment variable with a default; see .env.example.
+name: songbook
+
+x-ids: &ids
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+x-songbook: &songbook
+  image: ${SONGBOOK_IMAGE:-songbook:latest}
+  build:
+    context: .
+    target: app
+  restart: unless-stopped
+  volumes:
+    - ${SONGBOOK_DATA:-./data}:/data
+
+services:
+  api:
+    <<: *songbook
+    command: ["api"]
+    environment:
+      <<: *ids
+      METUBE_URL: ${METUBE_URL:-http://metube:8081}
+      SONGBOOK_BASE_PATH: ${SONGBOOK_BASE_PATH:-}
+      SONGBOOK_AUTH_USER: ${SONGBOOK_AUTH_USER:-}
+      SONGBOOK_AUTH_PASSWORD_HASH: ${SONGBOOK_AUTH_PASSWORD_HASH:-}
+    ports:
+      - "${SONGBOOK_BIND:-0.0.0.0}:${SONGBOOK_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-m", "songbook.healthcheck", "api"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  worker:
+    <<: *songbook
+    command: ["worker"]
+    environment:
+      <<: *ids
+      METUBE_URL: ${METUBE_URL:-http://metube:8081}
+      SONGBOOK_CACHE_MAX_GB: ${SONGBOOK_CACHE_MAX_GB:-20}
+      SONGBOOK_DOWNLOAD_TIMEOUT_S: ${SONGBOOK_DOWNLOAD_TIMEOUT_S:-900}
+      SONGBOOK_SCAN_INTERVAL_S: ${SONGBOOK_SCAN_INTERVAL_S:-300}
+    depends_on:
+      api:
+        condition: service_healthy   # the api creates the data dirs and applies migrations
+    healthcheck:
+      test: ["CMD", "python", "-m", "songbook.healthcheck", "worker"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  metube:
+    image: ghcr.io/alexta69/metube:${METUBE_VERSION:-2026.09.26}
+    restart: unless-stopped
+    environment:
+      <<: *ids                       # MeTube reads PUID/PGID itself (UID/GID are legacy aliases)
+      UMASK: "022"
+      DOWNLOAD_DIR: /downloads
+      STATE_DIR: /state              # keep MeTube's queue state out of originals/
+      TEMP_DIR: /downloads/.metube-tmp   # same filesystem as downloads, so finished files are renamed in
+      OUTPUT_TEMPLATE: "%(id)s.%(ext)s"
+      YTDL_OPTIONS: '{"writeinfojson": true, "merge_output_format": "mp4"}'
+    volumes:
+      - ${SONGBOOK_DATA:-./data}/originals:/downloads
+      - ${SONGBOOK_DATA:-./data}/metube-state:/state
+    # No ports: only the worker talks to MeTube. To use its own UI too, see
+    # compose.metube-ui.yml in the README.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

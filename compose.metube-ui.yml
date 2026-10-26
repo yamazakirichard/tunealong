@@ -1,0 +1,8 @@
+# Opt in to MeTube's own web UI as well:
+#   docker compose -f compose.yml -f compose.metube-ui.yml up -d
+# then open http://localhost:8081. Downloads made there land in originals/
+# like any other, and the next library scan picks them up.
+services:
+  metube:
+    ports:
+      - "${METUBE_BIND:-127.0.0.1}:${METUBE_PORT:-8081}:8081"

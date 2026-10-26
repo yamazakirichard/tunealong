@@ -1,0 +1,21 @@
+# Test override: replace MeTube with the fake from api/tests (no network, no
+# YouTube). Used by scripts/compose_test.sh for the Playwright smoke run.
+#   docker compose -f compose.yml -f compose.fake-metube.yml up -d
+services:
+  metube:
+    image: songbook:test
+    build:
+      context: .
+      target: test
+    entrypoint: []
+    command: ["python", "-m", "tests.fake_metube", "--originals", "/downloads", "--port", "8081"]
+    working_dir: /app/api
+    user: "${PUID:-1000}:${PGID:-1000}"
+    volumes: !override
+      - ${SONGBOOK_DATA:-./data}/originals:/downloads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/history', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 5s
+      retries: 10

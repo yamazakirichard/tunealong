@@ -146,3 +146,41 @@ Judgement calls made during implementation, newest last.
   - **The root is wiped on start and on every reset, so the script refuses any non-empty folder without its `.songbook-dev-root` marker.** `make dev` uses `.dev-data/` (gitignored), never `data/`.
 - **Where things run.** vitest and the Vite build run locally (code-server has Node 22) and also inside the Dockerfile's `web` stage. Playwright runs in the `e2e` stage: `mcr.microsoft.com/playwright:v1.64.1-noble` plus python3, ffmpeg and rubberband-cli, against `dev_stack.py`, one test at a time, with Chromium launched with `--autoplay-policy=no-user-gesture-required`.
 - **Pinned versions**: React 19.3.1, Vite 8.3.5, Tailwind 4.3.3, vitest 5.0.5, `@headlessui/react` 2.2.10, Playwright 1.64.1. TypeScript is held at 5.9.3, not the new 7.x.
+
+## Phase 7
+
+- **MeTube user and group** (from the image's `docker-entrypoint.sh`, 2026.09.26): it reads `PUID`/`PGID` natively (`UID`/`GID` are legacy aliases that win if set). Started as root, it chowns its dirs (`CHOWN_DIRS`, default true) and drops to `PUID:PGID` with gosu. So compose passes our `PUID`/`PGID` straight through, with no mapping. `CHOWN_DIRS` stays on, because Docker creates missing bind-mount dirs as root and MeTube must be able to write them.
+- **MeTube paths**: `STATE_DIR=/state` (its own `data/metube-state/`, out of `originals/`). `TEMP_DIR=/downloads/.metube-tmp`, on the same filesystem so finished files are renamed in; the scan ignores subdirectories and partial names anyway. `OUTPUT_TEMPLATE` and `YTDL_OPTIONS` as in §1, with no `download_archive`. The MeTube image is pinned to `2026.09.26` (`METUBE_VERSION`).
+- **The Songbook image entrypoint** (`docker/entrypoint.sh`) starts as root:
+  - It creates `originals/local` and `renders`, chowns only those top-level dirs and the sqlite files (never a recursive walk of the library), then re-runs itself as `PUID:PGID` via `setpriv` (in Debian's util-linux, so no gosu).
+  - `api` runs uvicorn on 8080, `worker` runs the worker, and anything else is run as given (e.g. `python -m songbook.import_legacy`).
+  - The worker waits for the api to be healthy, so the dirs and migrations are in place first.
+- **`SONGBOOK_BASE_PATH` is read at runtime.** When set, the FastAPI app is mounted under it in a small Starlette wrapper, which also forwards the lifespan, because mounted apps don't get lifespan events. `/songbook` redirects (308) to `/songbook/`, and nothing is served at `/`. The proxy must pass the prefix through, not strip it. Paths are normalised (`songbook/` becomes `/songbook`), and `..` or empty segments are rejected at startup.
+- **Built-in auth** is a pure ASGI middleware (so streaming isn't buffered), on only when both `SONGBOOK_AUTH_USER` and `SONGBOOK_AUTH_PASSWORD_HASH` are set.
+  - `<base>/api/health` stays open, and everything else, including the UI and media, needs credentials.
+  - bcrypt is checked once per distinct `Authorization` header, then remembered in memory by SHA-256 (at most 64 entries), because the player makes many Range requests. The username compare is constant-time. A malformed hash denies rather than crashes.
+  - `bcrypt` is now a runtime dependency.
+- **Healthchecks** (`python -m songbook.healthcheck api|worker`):
+  - The api check fetches `<base>/api/health`, which runs a DB query.
+  - The worker touches `SONGBOOK_HEARTBEAT` (`/tmp/songbook-worker.heartbeat` in the image) from a thread every 15 s, so a long render doesn't look like a hang. The check wants it younger than 60 s.
+  - MeTube is checked with curl on its own port.
+- **Hourly cache GC from the worker** (`SONGBOOK_CACHE_MAX_GB`, default 20 in compose and unset, meaning off, outside it; `SONGBOOK_GC_INTERVAL_S`, default 3600). It runs between jobs, never during a render. GC now leaves hidden temp files and `.work` dirs alone unless they're older than twice the render timeout, so a manual `python -m songbook.cache gc` can't delete a render in progress.
+- **Ports**: only the api is published (`SONGBOOK_BIND:SONGBOOK_PORT`, default `0.0.0.0:8080`). MeTube's own UI is opt-in via `compose.metube-ui.yml`, which binds `127.0.0.1:8081`.
+- **`compose.fake-metube.yml`** swaps MeTube for the fake from `api/tests`, run as `PUID:PGID` from the `test` image with `volumes: !override` (Compose 2.24+), for the containerised smoke run. `python -m tests.fake_metube` serves it.
+- **Gate 7 runs as `scripts/compose_test.sh`** (`make compose-test`):
+  - It works from a clean copy of the checkout (tracked plus new, non-ignored files) in `.compose-test/`, so a real `.env` or `data/` is never touched, and it refuses to run while a `songbook` compose project is up.
+  - It checks:
+    - defaults reach healthy, the UI is served, there's no auth, and the tools are in the image, with ownership at 1000:1000
+    - the Playwright smoke subset passes against the containers with the fake MeTube
+    - PUID/PGID 1234 plus `SONGBOOK_BASE_PATH=/songbook` passes the smoke subset under the subpath, and every file written is owned by 1234:1234
+    - auth, with the hash written with `$$` in `.env`
+    - the static checks
+  - HTTP probes run in a `--network host` container (`scripts/http_probe.py`), because code-server is on its own bridge network. Playwright's smoke run uses host networking too, so the page is on `localhost`, a secure context where the audio worklet is available.
+- **Playwright smoke subset** (`e2e/tests/smoke.spec.ts`): it runs only when `E2E_BASE_URL` is set, with no dev reset hook. It adds a song with a random ID through the UI, plays it in the modal, and saves a +2 default preset until "cached". It then fetches the render with a Range request and reopens after a reload.
+- **Static checks** (`scripts/check_self_contained.py`):
+  - Outside docs, every domain must be on a short allowlist (the YouTube hosts the parser accepts, plus credit URLs).
+  - Nowhere, docs included, may `*.local`/`*.lan`/`*.home`/`*.internal` names or private IPs appear.
+  - There are no symlinks, and every `../` path in a file must resolve inside `Songbook/`.
+  - The checker was itself checked with a planted file (a `.local` URL, a private IP, a `../` escape and an unlisted domain), and all four were flagged.
+- **The `app` stage is last in the Dockerfile**, so a plain `docker build .` gives the production image. Compose builds `target: app` and tags it `SONGBOOK_IMAGE` (default `songbook:latest`).
+- **Shell variables beat `.env` in Compose.** The first Gate 7 run "passed" PUID 1234 into `.env`, but the containers ran as 1000, because the calling shell (a linuxserver-style container) exports `PUID`/`PGID`. `compose_test.sh` now runs compose with every `.env.example` key unset, so `.env` is the only source. The README and `.env.example` warn about this precedence.
