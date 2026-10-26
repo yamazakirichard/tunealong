@@ -5,8 +5,8 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import ValidationError
 
-from .. import cache, db, library
-from ..deps import get_conn
+from .. import cache, config, db, library
+from ..deps import get_conn, get_settings
 from ..models import PresetIn, PresetPatch
 
 router = APIRouter(prefix="/api")
@@ -49,17 +49,26 @@ def list_presets(song_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> 
         "SELECT * FROM presets WHERE song_id = ? ORDER BY name COLLATE NOCASE", (song_id,))]
 
 
+def _saved(conn, settings, preset_id: int) -> dict:
+    """After a save: make sure a shifted preset's render is cached or on its way."""
+    p = _get(conn, preset_id)
+    cache.ensure_render(conn, settings, p["song_id"], p["semitones"], p["tempo"], p["bake_tempo"])
+    return p
+
+
 @router.post("/songs/{song_id}/presets", status_code=201)
-def create_preset(song_id: int, body: PresetIn, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
+def create_preset(song_id: int, body: PresetIn, conn: sqlite3.Connection = Depends(get_conn),
+                  settings: config.Settings = Depends(get_settings)) -> dict:
     with db.transaction(conn):
         if not conn.execute("SELECT 1 FROM songs WHERE id = ?", (song_id,)).fetchone():
             raise HTTPException(404, "song not found")
         preset_id = _write(conn, song_id, body)
-    return _get(conn, preset_id)
+        return _saved(conn, settings, preset_id)
 
 
 @router.patch("/presets/{preset_id}")
-def patch_preset(preset_id: int, body: PresetPatch, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
+def patch_preset(preset_id: int, body: PresetPatch, conn: sqlite3.Connection = Depends(get_conn),
+                 settings: config.Settings = Depends(get_settings)) -> dict:
     with db.transaction(conn):
         row = conn.execute("SELECT * FROM presets WHERE id = ?", (preset_id,)).fetchone()
         if row is None:
@@ -70,7 +79,7 @@ def patch_preset(preset_id: int, body: PresetPatch, conn: sqlite3.Connection = D
         except ValidationError as e:
             raise HTTPException(422, e.errors(include_url=False, include_context=False))
         _write(conn, row["song_id"], p, preset_id)
-    return _get(conn, preset_id)
+        return _saved(conn, settings, preset_id)
 
 
 @router.delete("/presets/{preset_id}", status_code=204)
@@ -78,3 +87,16 @@ def delete_preset(preset_id: int, conn: sqlite3.Connection = Depends(get_conn)) 
     if conn.execute("DELETE FROM presets WHERE id = ?", (preset_id,)).rowcount == 0:
         raise HTTPException(404, "preset not found")
     return Response(status_code=204)
+
+
+@router.get("/presets/{preset_id}/playback")
+def preset_playback(preset_id: int, conn: sqlite3.Connection = Depends(get_conn),
+                    settings: config.Settings = Depends(get_settings)) -> dict:
+    row = conn.execute("SELECT p.*, s.status AS song_status FROM presets p JOIN songs s ON s.id = p.song_id"
+                       " WHERE p.id = ?", (preset_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "preset not found")
+    if row["song_status"] != "ready":
+        raise HTTPException(409, f"song is {row['song_status']}, not ready")
+    with db.transaction(conn):
+        return cache.playback(conn, settings, row["song_id"], row)

@@ -76,3 +76,29 @@ Judgement calls made during implementation, newest last.
   - Content types are set explicitly: webm, mp4, mkv (`video/x-matroska`), mp3 and m4a (`audio/mp4`).
   - Serving a render updates its `last_used_at`.
 - **`GET /api/jobs`** returns newest first, with `?status=` and `?limit=` (default 100, max 1000). The payload is decoded.
+
+## Phase 5
+
+- **The test environment is Docker.** `rubberband-cli` isn't installed in the code-server dev container, and installing it there wouldn't survive a recreate. The `Dockerfile` therefore has a `runtime` stage (python:3.12-slim, ffmpeg, rubberband-cli 3.3.0, `fonts-dejavu-core` for the fixtures' `drawtext`) that Phase 7 builds on, plus a `test` stage. `make test-docker` builds it and runs the whole backend suite. `test_render.py` skips when rubberband is missing, so `make test-api` still works locally. **The gate counts only when run with `make test-docker`.**
+- **Rubber Band flags**: `-3 -q`, then `-p <semitones>` for pitch. `-T <tempo>` is a tempo multiple (`-T 0.5` plays twice as long), used only when tempo is baked. There's no formant preservation (`-F`) by default; that's left for a future preset option.
+- **Output container follows the original**, so the video can be stream-copied: webm → webm/Opus, mp4 → mp4/AAC, mkv → mkv/Opus. Audio-only originals (mp3, m4a) render to m4a/AAC. mp4 and m4a get `+faststart`.
+- **"Has video"** means a video stream that isn't an attached picture, so an mp3's cover art doesn't count. Audio-only renders map no video.
+- **Pitch-only renders stream-copy video** (`-map 0:v:0 -c:v copy`), which keeps it bit-identical (tested for webm, mp4 and mkv). Metadata and chapters are dropped.
+- **Baked tempo re-encodes video** with `setpts=PTS/<tempo>`: VP9 (CRF 32, `good`, cpu-used 4) for webm, otherwise H.264 (`veryfast`, CRF 20).
+- **Atomic output**: the work files go in `renders/<song_id>/.<key>.work/`, the muxed file is written to `.<key>.tmp.<ext>`, then `os.replace` puts it at `<key>.<ext>`. Leftovers for the key are removed before and after every attempt, so a hard crash's partial files are cleaned on the retry, and `gc` sweeps any others.
+- **The render job payload** carries the snapped values and the key (`dedupe_key = rn:<song_id>:<key>`). It's retried 3 times, like downloads. A song deleted mid-render drops the file, because the insert of the render row fails on the foreign key. `SONGBOOK_RENDER_TIMEOUT_S` (default 3600) is the per-tool timeout.
+- **Enqueue rules** (`cache.ensure_render`):
+  - Nothing is enqueued for identity settings, a song that isn't `ready`, or a key whose file is cached.
+  - A `renders` row whose file is gone is deleted and re-enqueued.
+  - It runs on preset create and update, and on playback.
+- **Playback** (`cache.playback`) is shared by `/api/presets/{id}/playback` and `/api/songs/{id}/playback`:
+  - It returns `{preset_id, source, url, live_semitones, live_tempo, time_scale, loop_a, loop_b, render_error}`.
+  - The key is recomputed from the preset's values. If `ENGINE_VERSION` changed, the stored `cache_key` is updated, so the old render is ignored and GC sees it as unreferenced.
+  - **A failed render is not retried on every open**: playback returns `source: "original"` with live pitch and `render_error` set. Saving the preset again retries it.
+  - A song that isn't `ready` returns 409.
+- **GC** (`cache.gc`, `python -m songbook.cache gc --max-gb N`):
+  - First it removes stray files under `renders/` that have no row, and stale work dirs.
+  - Then it evicts unreferenced renders (no preset with that song and key), LRU first by `coalesce(last_used_at, created_at)`, then plain LRU, until the cache is under budget.
+  - A row whose path resolves outside `renders/` is never deleted. Empty song dirs are removed.
+  - Hourly scheduling from the worker is Phase 7.
+- **numpy is a dev dependency** for the FFT tests. Each test takes the middle 60% of the audio, applies a Hann window, and interpolates the FFT peak.

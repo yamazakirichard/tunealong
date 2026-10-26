@@ -5,7 +5,7 @@ PY    := $(VENV)/bin/python
 DEV_ROOT ?= $(CURDIR)/data
 PORT  ?= 8080
 
-.PHONY: test test-api test-web e2e fixtures dev build venv clean
+.PHONY: test test-api test-docker test-web e2e fixtures dev build venv clean
 
 test: test-api test-web
 
@@ -21,6 +21,12 @@ fixtures:
 
 test-api: venv fixtures
 	cd api && .venv/bin/python -m pytest -q
+
+# The backend suite inside the image, with the real ffmpeg and rubberband
+# (test_render.py skips locally when rubberband isn't installed).
+test-docker:
+	docker build -q --target test -t songbook:test . >/dev/null
+	docker run --rm songbook:test
 
 # The web app arrives in Phase 6; until then these are no-ops.
 test-web:

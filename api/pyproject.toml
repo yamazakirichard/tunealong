@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
+  "numpy>=1.26",
 ]
 
 [tool.setuptools.packages.find]

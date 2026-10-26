@@ -6,7 +6,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 
-from .. import artists, config, db, jobs, library
+from .. import artists, cache, config, db, jobs, library
 from ..deps import get_conn, get_settings
 from ..models import LinkIn, SongAdd, SongPatch
 from ..youtube import parse_id
@@ -147,25 +147,15 @@ def set_categories(song_id: int, ids: list[int], conn: sqlite3.Connection = Depe
 
 
 @router.get("/songs/{song_id}/playback")
-def song_playback(song_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
-    """What to play when the song opens: its default preset, else the original as-is.
-
-    Phase 4 always plays the original; Phase 5 adds cached renders.
-    """
+def song_playback(song_id: int, conn: sqlite3.Connection = Depends(get_conn),
+                  settings: config.Settings = Depends(get_settings)) -> dict:
+    """What to play when the song opens: its default preset, else the original as-is."""
     row = _song_or_404(conn, song_id)
     if row["status"] != "ready" or not row["original_path"]:
         raise HTTPException(409, f"song is {row['status']}, not ready")
     p = conn.execute("SELECT * FROM presets WHERE song_id = ? AND is_default = 1", (song_id,)).fetchone()
-    return {
-        "preset_id": p["id"] if p else None,
-        "source": "original",
-        "url": f"/media/originals/{song_id}",
-        "live_semitones": p["semitones"] if p else 0.0,
-        "live_tempo": p["tempo"] if p else 1.0,
-        "time_scale": 1.0,
-        "loop_a": p["loop_a"] if p else None,
-        "loop_b": p["loop_b"] if p else None,
-    }
+    with db.transaction(conn):
+        return cache.playback(conn, settings, song_id, p)
 
 
 def _inside(base, path):

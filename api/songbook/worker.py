@@ -9,7 +9,7 @@ import logging
 import sqlite3
 import time
 
-from . import config, db, ingest, jobs
+from . import config, db, ingest, jobs, render
 from .media import YT_NAME_RE
 from .metube import MetubeClient
 
@@ -55,6 +55,8 @@ class Worker:
         try:
             if job["kind"] == "download":
                 self._download(payload["youtube_id"])
+            elif job["kind"] == "render":
+                self._render(payload)
             elif job["kind"] == "scan":
                 ingest.scan(self.conn, self.settings)
             else:
@@ -95,6 +97,29 @@ class Worker:
         res = ingest.scan(self.conn, self.settings, youtube_id=yid)
         if res.skipped:
             raise DownloadFailed("; ".join(res.skipped))
+
+    def _render(self, payload: dict) -> None:
+        song_id, key = payload["song_id"], payload["cache_key"]
+        song = self.conn.execute("SELECT original_path FROM songs WHERE id = ?", (song_id,)).fetchone()
+        if song is None or not song["original_path"]:
+            log.info("render %s for song %s skipped: song or original gone", key, song_id)
+            return
+        out_dir = self.settings.renders_dir / str(song_id)
+        final = render.render(render.Job(
+            original=self.settings.root / song["original_path"], out_dir=out_dir, key=key,
+            semitones=payload["semitones"], tempo=payload["tempo"], bake_tempo=payload["bake_tempo"],
+        ), timeout=self.settings.render_timeout_s)
+        rel = final.relative_to(self.settings.root).as_posix()
+        try:
+            with db.transaction(self.conn):
+                self.conn.execute(
+                    "INSERT INTO renders (song_id, cache_key, path, bytes) VALUES (?, ?, ?, ?)"
+                    " ON CONFLICT (song_id, cache_key) DO UPDATE SET path = excluded.path,"
+                    " bytes = excluded.bytes, created_at = datetime('now')",
+                    (song_id, key, rel, final.stat().st_size))
+        except sqlite3.IntegrityError:
+            final.unlink(missing_ok=True)  # the song was deleted while rendering
+            log.info("render %s for song %s dropped: song deleted meanwhile", key, song_id)
 
     def _file_for(self, yid: str):
         for p in self.settings.originals_dir.glob(f"{yid}.*"):

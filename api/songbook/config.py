@@ -14,6 +14,7 @@ class Settings:
     download_poll_s: float = 2.0
     scan_interval_s: float = 300.0
     worker_idle_s: float = 1.0
+    render_timeout_s: float = 3600.0
 
     @property
     def db_path(self) -> Path:
@@ -41,6 +42,7 @@ def load() -> Settings:
         download_poll_s=float(os.environ.get("SONGBOOK_DOWNLOAD_POLL_S", "2")),
         scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),
         worker_idle_s=float(os.environ.get("SONGBOOK_WORKER_IDLE_S", "1")),
+        render_timeout_s=float(os.environ.get("SONGBOOK_RENDER_TIMEOUT_S", "3600")),
     )
 
 
