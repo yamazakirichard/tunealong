@@ -188,3 +188,9 @@ Judgement calls made during implementation, newest last.
 ## After Phase 7
 
 - **The definition of done's legacy-import review was waived by the owner** ("No import needed", 2026-10-26). The dry run against the real MeTube folder was shown in Phase 2. The importer stays available (`python -m songbook.import_legacy`) but hasn't been run on real data.
+- **Rubber Band now renders tempo too, for every saved preset** (the owner's call, 2026-10-26, for quality). This supersedes the plan's "bake_tempo is allowed but never the default".
+  - `bake_tempo` defaults to true in the API, and the UI always sends true, so the "Bake tempo" checkbox is gone. The API still accepts `bake_tempo: false` (live-only tempo), for scripts and compatibility.
+  - Rendering at a tempo no longer re-encodes video: the packets are stream-copied, and the `setts` bitstream filter divides their timestamps by the tempo (`-avoid_negative_ts make_zero`, without which an H.264 MP4's unscaled edit list dropped the first two frames). Every frame is bit-identical and the render is as fast as a pitch-only one. Tested for webm and mp4 at 0.5× and 1.25× (packets, decoded frames, frame count and stream duration), plus pitch and tempo together and audio-only.
+  - Tempo-only presets (0 semitones) now render too, so a slowed-down song is Rubber Band quality rather than the browser's time-stretch.
+  - The live controls remain a preview (SoundTouch pitch, browser tempo) until the render is ready. Then the player switches to the render at `playbackRate` 1, mapping the position by `time_scale`.
+  - The cost: each distinct pitch-and-tempo pair is its own render, so the cache grows faster. GC still caps it at `SONGBOOK_CACHE_MAX_GB`.

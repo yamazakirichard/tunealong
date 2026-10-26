@@ -161,3 +161,29 @@ test("A/B loop keeps playback between the points", async ({ page }) => {
   expect(t).toBeGreaterThanOrEqual(s.loop_a - 0.05);
   expect(t).toBeLessThanOrEqual(s.loop_b + 0.1);
 });
+
+test("a saved tempo is rendered by Rubber Band: the render plays at rate 1, timeline mapped", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await page.getByLabel("Tempo", { exact: true }).fill("0.75");
+  await expect.poll(async () => (await sb(page)).playbackRate).toBe(0.75); // live preview first
+  await saveAs(page, "Slow", true);
+  await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 30_000 });
+  await expect.poll(async () => (await sb(page)).src).toContain("/media/renders/");
+  let s = await sb(page);
+  expect(s.playbackRate).toBe(1); // the slowdown is in the file now
+  expect(s.time_scale).toBeCloseTo(1 / 0.75, 3);
+  expect(s.pitch).toBe(0);
+  expect(s.paused).toBe(false);
+
+  await page.reload();
+  await openSong(page, A);
+  await expect(page.getByTestId("render-badge")).toHaveText("cached");
+  s = await sb(page);
+  expect(s.playbackRate).toBe(1);
+  expect(s.tempo).toBe(0.75);
+  // The rendered file is a third longer than the 10 s original.
+  const dur = await page.evaluate(() => (document.querySelector("video") as HTMLVideoElement).duration);
+  expect(dur).toBeGreaterThan(13);
+  expect(dur).toBeLessThan(13.7);
+});

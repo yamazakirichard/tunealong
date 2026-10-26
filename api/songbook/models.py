@@ -66,7 +66,8 @@ class PresetIn(_Strict):
     name: Name
     semitones: float = Field(default=0.0, ge=-12, le=12)
     tempo: float = Field(default=1.0, ge=0.25, le=2.0)
-    bake_tempo: bool = False
+    # Rubber Band renders tempo too, unless a client asks for live tempo only.
+    bake_tempo: bool = True
     loop_a: float | None = Field(default=None, ge=0)
     loop_b: float | None = Field(default=None, ge=0)
     is_default: bool = False

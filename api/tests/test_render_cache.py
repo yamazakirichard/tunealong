@@ -65,7 +65,7 @@ def test_saving_same_preset_twice_renders_once(client, conn, settings, song, wor
     client.patch(f"/api/presets/{p['id']}", json={"semitones": 2, "name": "renamed"})  # after
     worker.run_until_idle()
     assert len(render_jobs(conn)) == 1 and len(renders) == 1
-    assert files(settings, song) == ["p+2.00_t1.000_bt0_rb3-v1.webm"]
+    assert files(settings, song) == ["p+2.00_t1.000_bt1_rb3-v1.webm"]
 
 
 def test_identical_presets_share_one_render(client, conn, settings, song, worker, renders):
@@ -77,8 +77,9 @@ def test_identical_presets_share_one_render(client, conn, settings, song, worker
 
 
 def test_live_tempo_doesnt_split_the_cache(client, conn, settings, song, worker, renders):
-    a = preset(client, song, name="a", semitones=2, tempo=0.8)
-    b = preset(client, song, name="b", semitones=2, tempo=1.0)
+    # The API still offers live-only tempo (bake_tempo=false); the UI always bakes.
+    a = preset(client, song, name="a", semitones=2, tempo=0.8, bake_tempo=False)
+    b = preset(client, song, name="b", semitones=2, tempo=1.0, bake_tempo=False)
     assert a["cache_key"] == b["cache_key"] == "p+2.00_t1.000_bt0_rb3-v1"
     worker.run_until_idle()
     assert len(renders) == 1
@@ -120,13 +121,13 @@ def test_engine_version_bump_gives_new_key_and_render(client, conn, settings, so
     monkeypatch.setattr(cache, "ENGINE_VERSION", "v2")
     pb = playback(client, p["id"])
     assert pb["source"] == "pending"  # the v1 render is ignored
-    assert client.get(f"/api/songs/{song}/presets").json()[0]["cache_key"] == "p+2.00_t1.000_bt0_rb3-v2"
+    assert client.get(f"/api/songs/{song}/presets").json()[0]["cache_key"] == "p+2.00_t1.000_bt1_rb3-v2"
     worker.run_until_idle()
     assert len(renders) == 2 and renders[1].key.endswith("-v2")
     assert playback(client, p["id"])["source"] == "render"
 
 
-@pytest.mark.parametrize("kw", [{}, {"tempo": 0.7}, {"tempo": 1.0, "bake_tempo": True}])
+@pytest.mark.parametrize("kw", [{}, {"tempo": 0.7, "bake_tempo": False}, {"tempo": 1.0, "bake_tempo": True}])
 def test_identity_preset_makes_no_job(client, conn, song, renders, kw):
     p = preset(client, song, **kw)
     assert p["cache_key"] is None and render_jobs(conn) == []
@@ -136,15 +137,17 @@ def test_identity_preset_makes_no_job(client, conn, song, renders, kw):
 
 
 def test_pending_then_render(client, conn, song, worker, renders):
-    p = preset(client, song, semitones=2, tempo=0.9)
+    p = preset(client, song, semitones=2, tempo=0.8)
     pb = playback(client, p["id"])
+    # Pending: the original with live pitch and tempo as a preview.
     assert (pb["source"], pb["url"], pb["live_semitones"], pb["live_tempo"]) == (
-        "pending", f"media/originals/{song}", 2.0, 0.9)
+        "pending", f"media/originals/{song}", 2.0, 0.8)
     worker.run_until_idle()
     pb = playback(client, p["id"])
     rid = conn.execute("SELECT id FROM renders").fetchone()[0]
+    # Ready: Rubber Band did both, so nothing is left to do live.
     assert (pb["source"], pb["url"], pb["live_semitones"], pb["live_tempo"], pb["time_scale"]) == (
-        "render", f"media/renders/{rid}", 0.0, 0.9, 1.0)
+        "render", f"media/renders/{rid}", 0.0, 1.0, 1.25)
     assert client.get(pb["url"]).status_code == 200
 
 
@@ -252,3 +255,21 @@ def test_gc_cli(client, conn, settings, song, capsys):
     _render(conn, settings, song, "k", 100, None)
     assert cache.main(["gc", "--max-gb", "0"]) == 0
     assert "1 file(s) removed" in capsys.readouterr().out
+
+
+def test_saved_presets_bake_tempo_by_default(client, song, worker, renders):
+    p = preset(client, song, semitones=2, tempo=0.8)
+    assert p["bake_tempo"] is True and p["cache_key"] == "p+2.00_t0.800_bt1_rb3-v1"
+    worker.run_until_idle()
+    job = renders[0]
+    assert (job.semitones, job.tempo, job.bake_tempo) == (2.0, 0.8, True)
+
+
+def test_tempo_only_preset_renders(client, conn, song, worker, renders):
+    p = preset(client, song, tempo=0.75)
+    assert p["cache_key"] == "p+0.00_t0.750_bt1_rb3-v1"
+    assert playback(client, p["id"])["source"] == "pending"
+    worker.run_until_idle()
+    pb = playback(client, p["id"])
+    assert (pb["source"], pb["live_tempo"], pb["live_semitones"]) == ("render", 1.0, 0.0)
+    assert pb["time_scale"] == pytest.approx(1 / 0.75)

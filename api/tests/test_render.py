@@ -43,6 +43,27 @@ def video_md5(path: Path) -> str:
                            "-f", "md5", "-"], capture_output=True, check=True, text=True).stdout.strip()
 
 
+def decoded_md5(path: Path) -> str:
+    return subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-map", "0:v", "-fps_mode", "passthrough",
+                           "-f", "md5", "-"], capture_output=True, check=True, text=True).stdout.strip()
+
+
+def frame_count(path: Path) -> int:
+    return int(subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
+                               "stream=nb_read_frames", "-of", "csv=p=0", str(path)],
+                              capture_output=True, check=True, text=True).stdout)
+
+
+def video_duration(path: Path) -> float:
+    """End of the video stream (last packet's pts + duration), not the container's,
+    which also counts the audio track's encoder padding."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "packet=pts_time,duration_time", "-of", "csv=p=0", str(path)],
+                         capture_output=True, check=True, text=True).stdout
+    ends = [float(a) + float(b) for a, b in (line.split(",")[:2] for line in out.split()) if a != "N/A" and b != "N/A"]
+    return max(ends)
+
+
 def make_job(src: Path, out_dir: Path, semitones=0.0, tempo=1.0, bake=False) -> render.Job:
     return render.Job(original=src, out_dir=out_dir, key=cache_key(semitones, tempo, bake),
                       semitones=semitones, tempo=tempo, bake_tempo=bake)
@@ -106,14 +127,37 @@ def test_audio_only_original(tmp_path, out):
     assert abs(duration(f) - duration(src)) <= 0.050
 
 
-def test_baked_half_tempo(tone, out):
-    f = render.render(make_job(tone, out, tempo=0.5, bake=True))
-    assert f.name == "p+0.00_t0.500_bt1_rb3-v1.webm"
-    assert duration(f) == pytest.approx(2 * duration(tone), abs=0.15)
+@pytest.mark.parametrize("name", ["AAAAAAAAAAA.webm", "CCCCCCCCCCC.mp4"])
+@pytest.mark.parametrize("tempo", [0.5, 1.25])
+def test_baked_tempo_retimes_video_without_reencoding(tmp_path, out, name, tempo):
+    src = tmp_path / name
+    shutil.copy(FIXTURES / name, src)
+    f = render.render(make_job(src, out, semitones=0, tempo=tempo, bake=True))
+    assert f.name == f"p+0.00_t{tempo:.3f}_bt1_rb3-v1{src.suffix}"
+    # Rubber Band stretched the audio: about 1/tempo times as long, pitch unchanged.
+    assert duration(f) == pytest.approx(duration(src) / tempo, abs=0.15)
     assert dominant_hz(decode(f)) == pytest.approx(440, abs=3)
-    v = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration",
-                        "-of", "csv=p=0", str(f)], capture_output=True, text=True, check=True).stdout
-    assert float(v) == pytest.approx(20, abs=0.3)
+    # The video wasn't re-encoded: same packets, and every frame decodes identically.
+    assert video_md5(f) == video_md5(src)
+    assert decoded_md5(f) == decoded_md5(src)
+    assert frame_count(f) == frame_count(src)
+    assert video_duration(f) == pytest.approx(10 / tempo, abs=0.1)
+
+
+def test_baked_pitch_and_tempo_together(tone, out):
+    f = render.render(make_job(tone, out, semitones=2, tempo=0.8, bake=True))
+    assert duration(f) == pytest.approx(duration(tone) / 0.8, abs=0.15)
+    assert dominant_hz(decode(f)) == pytest.approx(493.9, abs=3)
+
+
+def test_baked_tempo_audio_only(tmp_path, out):
+    src = tmp_path / "GGGGGGGGGGG.mp3"
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
+                    "-ar", "48000", "-c:a", "libmp3lame", str(src)], check=True)
+    f = render.render(make_job(src, out, semitones=0, tempo=0.5, bake=True))
+    assert not render.has_video(f)
+    assert duration(f) == pytest.approx(10, abs=0.15)
+    assert dominant_hz(decode(f)) == pytest.approx(440, abs=3)
 
 
 def test_killed_subprocess_leaves_no_visible_file_and_retry_works(tone, out, monkeypatch):

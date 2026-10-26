@@ -284,12 +284,14 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     }
   };
 
-  const save = async (name: string, makeDefault: boolean, bakeTempo: boolean) => {
+  // Saving renders pitch AND tempo with Rubber Band; until that's ready the
+  // live preview (SoundTouch pitch, browser tempo) keeps playing.
+  const save = async (name: string, makeDefault: boolean) => {
     const body = {
       name,
       semitones,
       tempo,
-      bake_tempo: bakeTempo,
+      bake_tempo: true,
       loop_a: loopA,
       loop_b: loopB,
       is_default: makeDefault,
@@ -574,7 +576,6 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           <SaveDialog
             initialName={saveMode === "save" && preset ? preset.name : ""}
             initialDefault={saveMode === "save" && preset ? preset.is_default : false}
-            initialBake={saveMode === "save" && preset ? preset.bake_tempo : false}
             onCancel={() => setSaveMode(null)}
             onSave={save}
           />
@@ -584,19 +585,17 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   );
 }
 
-function SaveDialog({ initialName, initialDefault, initialBake, onCancel, onSave }: {
+function SaveDialog({ initialName, initialDefault, onCancel, onSave }: {
   initialName: string;
   initialDefault: boolean;
-  initialBake: boolean;
   onCancel: () => void;
-  onSave: (name: string, makeDefault: boolean, bake: boolean) => void;
+  onSave: (name: string, makeDefault: boolean) => void;
 }) {
   const [name, setName] = useState(initialName);
   const [makeDefault, setMakeDefault] = useState(initialDefault);
-  const [bake, setBake] = useState(initialBake);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (name.trim()) onSave(name.trim(), makeDefault, bake);
+    if (name.trim()) onSave(name.trim(), makeDefault);
   };
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onKeyDown={(e) => e.key === "Escape" && onCancel()}>
@@ -615,10 +614,7 @@ function SaveDialog({ initialName, initialDefault, initialBake, onCancel, onSave
           <input type="checkbox" name="make-default" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
           Make this the default for this song
         </label>
-        <label className="text-sm flex items-center gap-2" title="Renders the tempo too (slow). Otherwise tempo stays live.">
-          <input type="checkbox" name="bake-tempo" checked={bake} onChange={(e) => setBake(e.target.checked)} />
-          Bake tempo into the render (slow)
-        </label>
+        <p className="text-xs text-theme-500">Pitch and tempo are rendered with Rubber Band, cached for next time.</p>
         <div className="flex justify-end gap-2">
           <button type="button" className={plainButtonClass} onClick={onCancel}>Cancel</button>
           <button type="submit" className={buttonClass} disabled={!name.trim()}>Save</button>

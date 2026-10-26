@@ -1,5 +1,10 @@
 """Offline renders: ffmpeg extract → rubberband (R3) → ffmpeg remux.
 
+Rubber Band does both pitch (-p) and tempo (-T). The video is never
+re-encoded: for a tempo change its packets are copied and only their
+timestamps rescaled (the `setts` bitstream filter), so every frame stays
+bit-identical and a retimed render is as fast as a pitch-only one.
+
 Every path handed to ffmpeg/rubberband is absolute: YouTube IDs can start
 with `-`, which a relative path would turn into an option.
 
@@ -14,17 +19,15 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-# original extension → (output extension, ffmpeg muxer, audio encoder args, baked-video encoder args)
-_VP9 = ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-deadline", "good", "-cpu-used", "4", "-row-mt", "1"]
-_H264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+# original extension → (output extension, ffmpeg muxer, audio encoder args)
 _OPUS = ["-c:a", "libopus", "-b:a", "160k"]
 _AAC = ["-c:a", "aac", "-b:a", "192k"]
 FORMATS = {
-    "webm": ("webm", "webm", _OPUS, _VP9),
-    "mp4": ("mp4", "mp4", _AAC, _H264),
-    "mkv": ("mkv", "matroska", _OPUS, _H264),
-    "mp3": ("m4a", "ipod", _AAC, None),
-    "m4a": ("m4a", "ipod", _AAC, None),
+    "webm": ("webm", "webm", _OPUS),
+    "mp4": ("mp4", "mp4", _AAC),
+    "mkv": ("mkv", "matroska", _OPUS),
+    "mp3": ("m4a", "ipod", _AAC),
+    "m4a": ("m4a", "ipod", _AAC),
 }
 
 
@@ -73,7 +76,7 @@ def render(job: Job, timeout: float | None = None) -> Path:
     ext = src.suffix[1:].lower()
     if ext not in FORMATS:
         raise RenderError(f"can't render {src.suffix} files")
-    out_ext, muxer, audio_args, video_args = FORMATS[ext]
+    out_ext, muxer, audio_args = FORMATS[ext]
     job.out_dir.mkdir(parents=True, exist_ok=True)
     final = job.out_dir / f"{job.key}.{out_ext}"
     work = job.out_dir / f".{job.key}.work"
@@ -97,10 +100,14 @@ def render(job: Job, timeout: float | None = None) -> Path:
         if video:
             cmd += ["-map", "0:v:0"]
         cmd += ["-map", "1:a:0"]
-        if video and job.bake_tempo and job.tempo != 1:
-            cmd += ["-filter:v", f"setpts=PTS/{job.tempo:g}"] + (video_args or _H264)
-        elif video:
+        if video:
             cmd += ["-c:v", "copy"]
+        if video and job.bake_tempo and job.tempo != 1:
+            # Same packets, timestamps divided by the tempo. avoid_negative_ts keeps
+            # every frame of an H.264 stream with B-frames: without it the unscaled
+            # MP4 edit list cut the first frames.
+            t = f"{job.tempo:g}"
+            cmd += ["-bsf:v", f"setts=ts=TS/{t}:duration=DURATION/{t}", "-avoid_negative_ts", "make_zero"]
         cmd += audio_args + ["-map_metadata", "-1", "-map_chapters", "-1"]
         if muxer in ("mp4", "ipod"):
             cmd += ["-movflags", "+faststart"]
