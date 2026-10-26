@@ -32,3 +32,26 @@ Judgement calls made during implementation, newest last.
 - **Scan cost**: sha256 is computed only for a new row or when a song's file or status changes, so a periodic rescan doesn't re-hash every file.
 - **Scan sha collisions**: if a file's bytes already belong to another song (`original_sha256` is UNIQUE), the scan logs and skips it rather than failing the whole scan.
 - **Scan also flips `error` songs to `ready`** when their file appears, and clears `error`.
+
+## Phase 3
+
+- **MeTube contract** (read from the `ghcr.io/alexta69/metube:2026.09.26` image, `app/main.py`, and checked live against a throwaway container):
+  - `POST /add` takes JSON `{url, download_type, quality, format, codec}`. Songbook sends `video` / `best` / `any` / `auto`.
+  - It answers HTTP 200 `{"status": "ok"|"error", "msg"?}` as soon as the URL is **queued**. Re-adding a URL that's already queued or finished also returns `ok`.
+  - A download that fails later is visible only in `GET /history`: `done[]` holds an entry with `id`, `url`, `status: "error"` and yt-dlp's `msg`.
+  - `POST /delete {ids: [url], where: "done"}` clears history entries, which are keyed by URL.
+  - MeTube's cross-origin guard only rejects requests that carry a foreign `Origin`. Server-to-server calls send none, so no `CORS_ALLOWED_ORIGINS` setting is needed.
+  - A failed download still leaves an orphan `<id>.info.json`, which ingest already ignores.
+- **Songbook always sends the canonical `watch?v=<id>` URL**, because MeTube turns `&t=` into a clip and `&list=` into a playlist.
+- **The download job waits on both the filesystem and `/history`**. It succeeds when a strict `<id>.<ext>` file appears, fails at once on a MeTube error entry, and fails on timeout (`SONGBOOK_DOWNLOAD_TIMEOUT_S`, default 900; polling every `SONGBOOK_DOWNLOAD_POLL_S`, default 2).
+- **Before each `/add`, the worker clears stale failed history entries for that ID**, so a retry isn't judged by an old error. If the file is already on disk, MeTube isn't called at all.
+- **Retries**: `attempts` is incremented on claim. A failed attempt puts the job back to `pending` and the song back to `queued`. After 3 attempts the job and song become `error`, with the message stored on both. Retries are immediate (no backoff column) and run as the next job.
+- **Re-adding a song in `error`** resets it to `queued`, clears `error`, enqueues a new job and returns 202, as the plan says.
+- **Placeholder title**: a song added by URL without a title gets its ID as the title. A scan replaces it with `yt_title` while the title still equals the ID. A title the user gives, or edits later, is never overwritten.
+- **`/api/songs` uses one DB connection per request** (a FastAPI dependency), because sync endpoints run in a thread pool and transactions on a shared connection would interleave. The add check-and-insert runs in `BEGIN IMMEDIATE`, and the `one_active_job` index catches anything that slips past.
+- **Enqueue** is `INSERT … ON CONFLICT DO NOTHING RETURNING id`. A duplicate in-flight job is a no-op, not an error. `POST /api/library/rescan` returns `{"queued": bool}`.
+- **Scan schedule**: the worker enqueues a scan at startup and every `SONGBOOK_SCAN_INTERVAL_S` (default 300). An idle worker sleeps `SONGBOOK_WORKER_IDLE_S` (default 1).
+- **`METUBE_URL`** defaults to `http://metube:8081`, the compose service name.
+- **`httpx` is now a runtime dependency** (the MeTube client).
+- **Fake MeTube** (`tests/fake_metube.py`) is a Starlette app served by uvicorn on a free `127.0.0.1` port in a thread, so the worker's sync client talks to it unchanged. It mimics `/add` validation, `/history` error entries and `/delete`. Nothing leaves the machine.
+- **The artist get-or-create is shared** (`artists.py`) between the API and the importer.

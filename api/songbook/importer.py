@@ -13,7 +13,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import db
+from . import artists, db
 from .config import Settings
 from .media import AUDIO_EXTS, MEDIA_EXTS, VIDEO_EXTS, place_file, sha256_file
 
@@ -101,19 +101,13 @@ def apply(actions: list[Action], conn: sqlite3.Connection, settings: Settings) -
         if not target.exists():
             a.note = place_file(a.source, target)
         with db.transaction(conn):
-            artist_id = _artist_id(conn, a.artist) if a.artist else None
+            artist_id = artists.get_or_create(conn, a.artist) if a.artist else None
             conn.execute(
                 "INSERT INTO songs (youtube_id, artist_id, title, original_path,"
                 " original_sha256, status) VALUES (?, ?, ?, ?, ?, 'ready')",
                 (a.youtube_id, artist_id, a.title, a.dest, a.sha256),
             )
 
-
-def _artist_id(conn: sqlite3.Connection, name: str) -> int:
-    row = conn.execute("SELECT id FROM artists WHERE name = ?", (name,)).fetchone()  # NOCASE column
-    if row:
-        return row["id"]
-    return conn.execute("INSERT INTO artists (name) VALUES (?)", (name,)).lastrowid
 
 
 def _ext(path: Path) -> str:

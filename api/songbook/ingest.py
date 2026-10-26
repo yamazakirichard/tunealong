@@ -73,11 +73,14 @@ def _scan_youtube(conn, settings, path, yid, res: ScanResult) -> None:
                 res.created += 1
                 return
             if yt_title or uploader:
-                # Reference fields only; the user's title is left alone.
+                # Reference fields only. The title is replaced only while it is
+                # still the placeholder ID given to a song added by URL.
                 conn.execute(
                     "UPDATE songs SET yt_title = coalesce(?, yt_title),"
-                    " uploader = coalesce(?, uploader) WHERE id = ?",
-                    (yt_title, uploader, row["id"]),
+                    " uploader = coalesce(?, uploader),"
+                    " title = CASE WHEN title = youtube_id THEN coalesce(?, title) ELSE title END"
+                    " WHERE id = ?",
+                    (yt_title, uploader, yt_title, row["id"]),
                 )
             if row["status"] != "ready" or row["original_path"] != rel:
                 conn.execute(

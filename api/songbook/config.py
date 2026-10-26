@@ -8,7 +8,12 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     root: Path
-    busy_timeout_ms: int
+    busy_timeout_ms: int = 5000
+    metube_url: str = "http://metube:8081"
+    download_timeout_s: float = 900.0
+    download_poll_s: float = 2.0
+    scan_interval_s: float = 300.0
+    worker_idle_s: float = 1.0
 
     @property
     def db_path(self) -> Path:
@@ -31,6 +36,11 @@ def load() -> Settings:
     return Settings(
         root=Path(os.environ.get("SONGBOOK_ROOT", "/srv/songbook")).resolve(),
         busy_timeout_ms=int(os.environ.get("SONGBOOK_DB_BUSY_TIMEOUT_MS", "5000")),
+        metube_url=os.environ.get("METUBE_URL", "http://metube:8081").rstrip("/"),
+        download_timeout_s=float(os.environ.get("SONGBOOK_DOWNLOAD_TIMEOUT_S", "900")),
+        download_poll_s=float(os.environ.get("SONGBOOK_DOWNLOAD_POLL_S", "2")),
+        scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),
+        worker_idle_s=float(os.environ.get("SONGBOOK_WORKER_IDLE_S", "1")),
     )
 
 
