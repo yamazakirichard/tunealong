@@ -28,14 +28,17 @@ class ScanResult:
 def scan(conn: sqlite3.Connection, settings: Settings, youtube_id: str | None = None) -> ScanResult:
     """Idempotent. With `youtube_id`, only that ID's file in originals/ is scanned."""
     res = ScanResult()
+    # Files whose song the user deleted but kept on disk.
+    ignored = {r[0] for r in conn.execute("SELECT path FROM ignored_paths")}
     for path in sorted(settings.originals_dir.iterdir()):
         m = YT_NAME_RE.match(path.name)
         if not m or not path.is_file() or (youtube_id and m.group(1) != youtube_id):
             continue
-        _scan_youtube(conn, settings, path, m.group(1), res)
+        if _rel(settings, path) not in ignored:
+            _scan_youtube(conn, settings, path, m.group(1), res)
     if youtube_id is None and settings.local_dir.is_dir():
         for path in sorted(settings.local_dir.iterdir()):
-            if LOCAL_NAME_RE.match(path.name) and path.is_file():
+            if LOCAL_NAME_RE.match(path.name) and path.is_file() and _rel(settings, path) not in ignored:
                 _scan_local(conn, settings, path, res)
     return res
 

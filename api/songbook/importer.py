@@ -101,6 +101,7 @@ def apply(actions: list[Action], conn: sqlite3.Connection, settings: Settings) -
         if not target.exists():
             a.note = place_file(a.source, target)
         with db.transaction(conn):
+            conn.execute("DELETE FROM ignored_paths WHERE path = ?", (a.dest,))
             artist_id = artists.get_or_create(conn, a.artist) if a.artist else None
             conn.execute(
                 "INSERT INTO songs (youtube_id, artist_id, title, original_path,"

@@ -55,3 +55,24 @@ Judgement calls made during implementation, newest last.
 - **`httpx` is now a runtime dependency** (the MeTube client).
 - **Fake MeTube** (`tests/fake_metube.py`) is a Starlette app served by uvicorn on a free `127.0.0.1` port in a thread, so the worker's sync client talks to it unchanged. It mimics `/add` validation, `/history` error entries and `/delete`. Nothing leaves the machine.
 - **The artist get-or-create is shared** (`artists.py`) between the API and the importer.
+
+## Phase 4
+
+- **Routes are split by area** in `api/songbook/routes/`: `songs`, `presets`, `groups` (artists, categories, reorder), `library` (library, rescan, jobs) and `media`. `main.py` only builds the app. The read-side shaping lives in `library.py`.
+- **Deleting a song but keeping its file** records the path in a new `ignored_paths` table (migration 0002), which the scan skips. Without it, the next periodic rescan would bring the song straight back. Re-adding the URL or re-importing the file removes the entry. With `?delete_file=true` the file is deleted, and only if it resolves inside `originals/`. Either way `renders/<song_id>/` is removed, and a pending download job for the song is marked `error: cancelled: song deleted`.
+- **`GET /api/songs/{id}/playback`** (not in the plan's table) answers "what plays when this song opens": the default preset's pitch, tempo and loop, else `semitones=0, tempo=1.0`. It covers the Gate 4 "no presets" test. In Phase 4 the source is always `original`; Phase 5 adds renders and `/api/presets/{id}/playback`. It returns 409 for a song that isn't `ready`.
+- **Snapping**: both `tempo` and `semitones` snap to 0.01 on save, and `-0.0` is stored as `0.0`. `cache_key` is computed from the snapped values. `cache.py` holds the key function, and `fixtures/cache_keys.json` is the shared case table (Phase 6's vitest reads it too).
+- **Preset PATCH** merges the stored preset with the patch, then validates the result as a whole, so `loop_a`/`loop_b` ordering is checked against the stored values. Validation errors are 422 and change nothing. A duplicate preset name per song is 409.
+- **Duplicate names**: an artist or category name is unique regardless of case, and a clash returns 409.
+- **Request bodies reject unknown fields** (`extra=forbid`) and strip whitespace.
+- **`PATCH /api/songs`** accepts `artist_id` (an unknown id is 422) or `artist_name` (get-or-create, empty means Unsorted), not both. `title` can't be empty or null. Moving a song to another group clears its `sort_order`, since a manual position belongs to the old group.
+- **`/api/library`** returns `{group_by, groups: [{id, name, columns, style, sort_order, songs}]}`. Groups are ordered by `sort_order` first, then name (case-insensitive). The pseudo-group (`Unsorted` or `Uncategorised`) has `id: null` and always comes last.
+  - Unfiltered, empty groups are kept, so there's somewhere to drop songs. With `q` or `category`, empty groups are dropped.
+  - Search is a case-insensitive substring match (`instr`, not `LIKE`, so `%` and `_` are literal) on title, artist name, `yt_title` and `uploader`.
+  - Category groups have no columns or style of their own, so they use 4 / `row`.
+- **`/api/reorder`** sets `sort_order` to each id's position, in one transaction. Every id must exist and, for songs, have `artist_id = group_id` (null means Unsorted). Duplicates are 422. `group_id` with `artists` or `categories` is 422. A partial list is allowed. Song order is per song, so `group_by=category` shows the same relative order.
+- **`/media/*`** takes a numeric id as a string, so traversal attempts are 404, not 422. The path comes from the DB, is resolved strictly, and must stay inside `originals/` or `renders/`.
+  - Range, If-Range and 416 are handled by Starlette's `FileResponse`.
+  - Content types are set explicitly: webm, mp4, mkv (`video/x-matroska`), mp3 and m4a (`audio/mp4`).
+  - Serving a render updates its `last_used_at`.
+- **`GET /api/jobs`** returns newest first, with `?status=` and `?limit=` (default 100, max 1000). The payload is decoded.

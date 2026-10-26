@@ -1,0 +1,21 @@
+{
+  "engine": "rb3",
+  "engine_version": "v1",
+  "cases": [
+    {"semitones": 2, "tempo": 1.0, "bake_tempo": false, "key": "p+2.00_t1.000_bt0_rb3-v1"},
+    {"semitones": 2, "tempo": 0.8, "bake_tempo": false, "key": "p+2.00_t1.000_bt0_rb3-v1"},
+    {"semitones": -12, "tempo": 1.0, "bake_tempo": false, "key": "p-12.00_t1.000_bt0_rb3-v1"},
+    {"semitones": 12, "tempo": 1.0, "bake_tempo": false, "key": "p+12.00_t1.000_bt0_rb3-v1"},
+    {"semitones": 0.5, "tempo": 1.0, "bake_tempo": false, "key": "p+0.50_t1.000_bt0_rb3-v1"},
+    {"semitones": -1.5, "tempo": 1.25, "bake_tempo": false, "key": "p-1.50_t1.000_bt0_rb3-v1"},
+    {"semitones": 2, "tempo": 0.5, "bake_tempo": true, "key": "p+2.00_t0.500_bt1_rb3-v1"},
+    {"semitones": 0, "tempo": 0.75, "bake_tempo": true, "key": "p+0.00_t0.750_bt1_rb3-v1"},
+    {"semitones": -0.0, "tempo": 0.8333, "bake_tempo": true, "key": "p+0.00_t0.830_bt1_rb3-v1"},
+    {"semitones": -0.001, "tempo": 0.9, "bake_tempo": true, "key": "p+0.00_t0.900_bt1_rb3-v1"},
+    {"semitones": 2.004, "tempo": 1.0, "bake_tempo": false, "key": "p+2.00_t1.000_bt0_rb3-v1"},
+    {"semitones": 0, "tempo": 1.0, "bake_tempo": false, "key": null},
+    {"semitones": 0, "tempo": 0.6, "bake_tempo": false, "key": null},
+    {"semitones": 0, "tempo": 1.0, "bake_tempo": true, "key": null},
+    {"semitones": 0, "tempo": 1.004, "bake_tempo": true, "key": null}
+  ]
+}
