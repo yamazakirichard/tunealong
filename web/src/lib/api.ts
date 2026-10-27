@@ -82,6 +82,15 @@ export interface Job {
   payload: Record<string, unknown>;
 }
 
+export interface YoutubeInfo {
+  youtube_id: string;
+  yt_title: string | null;
+  uploader: string | null;
+  in_library: boolean;
+  artist: string | null;
+  title: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -113,6 +122,7 @@ export const api = {
   addSong: (body: { url: string; artist?: string; title?: string }) =>
     fetch("api/songs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(async (r) => ({ status: r.status, data: await r.json() })),
+  youtube: (url: string) => call<YoutubeInfo>("GET", `api/youtube?${new URLSearchParams({ url })}`),
   song: (id: number) => call<Song>("GET", `api/songs/${id}`),
   patchSong: (id: number, body: Partial<{ artist_id: number | null; artist_name: string; title: string; notes: string | null }>) =>
     call<Song>("PATCH", `api/songs/${id}`, body),

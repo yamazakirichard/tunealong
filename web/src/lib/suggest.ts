@@ -34,9 +34,3 @@ export function completion(typed: string, match: string | undefined): string {
   return fold(match.slice(0, typed.length)) === fold(typed) ? match.slice(typed.length) : "";
 }
 
-/** Song titles to suggest: the given artist's songs first, then everyone else's. */
-export function titleCandidates(songs: { title: string; artist_id: number | null }[], artistId: number | null | undefined): string[] {
-  if (artistId == null) return songs.map((s) => s.title);
-  const mine = songs.filter((s) => s.artist_id === artistId);
-  return [...mine, ...songs.filter((s) => s.artist_id !== artistId)].map((s) => s.title);
-}

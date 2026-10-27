@@ -1,7 +1,10 @@
-"""YouTube URL → video ID parsing."""
+"""YouTube URL → video ID parsing, and a video's title from oEmbed."""
 
 import re
+from functools import lru_cache
 from urllib.parse import parse_qs, urlsplit
+
+import httpx
 
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
@@ -38,3 +41,17 @@ def parse_id(url_or_id: str) -> str:
     if candidate and ID_RE.match(candidate):
         return candidate
     raise ValueError(f"not a YouTube video URL or ID: {url_or_id!r}")
+
+
+@lru_cache(maxsize=256)
+def oembed(endpoint: str, youtube_id: str) -> tuple[str | None, str | None]:
+    """(title, channel) from YouTube's oEmbed endpoint, which needs no API key.
+
+    Raises httpx.HTTPError when it's unreachable or refuses (401 for private
+    or non-embeddable videos, 404 for missing ones). Failures aren't cached.
+    """
+    r = httpx.get(endpoint, params={"url": f"https://www.youtube.com/watch?v={youtube_id}", "format": "json"},
+                  timeout=5.0, follow_redirects=True)
+    r.raise_for_status()
+    data = r.json()
+    return data.get("title") or None, data.get("author_name") or None

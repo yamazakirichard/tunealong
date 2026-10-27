@@ -1,5 +1,8 @@
 """A stand-in for MeTube, speaking the same /add, /history and /delete contract.
 
+It also answers YouTube's /oembed (SONGBOOK_OEMBED_URL points here in tests),
+with titles from OEMBED_TITLES or "YouTube title <id>", like its info.json.
+
 It records every /add call and, after a short delay, "downloads" by copying a
 fixture to originals/<id>.webm (temp name, then rename, like yt-dlp). It runs as
 a real HTTP server on 127.0.0.1 so the worker's sync client talks to it
@@ -24,6 +27,12 @@ from starlette.routing import Route
 from songbook.youtube import parse_id
 
 
+# Video ID → (title, channel) for /oembed, for the Add song guess.
+OEMBED_TITLES = {
+    "Pzzzzzzzzzz": ("Black Sabbath - Paranoid (Official Video)", "BlackSabbathVEVO"),
+}
+
+
 class FakeMetube:
     def __init__(self, originals: Path, fixture: Path, delay: float = 0.1, info_json: bool = False,
                  unique: bool = False):
@@ -40,6 +49,7 @@ class FakeMetube:
             Route("/add", self._add, methods=["POST"]),
             Route("/history", self._history, methods=["GET"]),
             Route("/delete", self._delete, methods=["POST"]),
+            Route("/oembed", self._oembed, methods=["GET"]),
         ])
 
     @property
@@ -67,6 +77,14 @@ class FakeMetube:
         body = await request.json()
         self.done = [d for d in self.done if d["url"] not in body.get("ids", [])]
         return JSONResponse({"status": "ok"})
+
+    async def _oembed(self, request: Request):
+        try:
+            yid = parse_id(request.query_params.get("url", ""))
+        except ValueError:
+            return JSONResponse({"error": "Not Found"}, status_code=404)
+        title, author = OEMBED_TITLES.get(yid, (f"YouTube title {yid}", "Fake Uploader"))
+        return JSONResponse({"title": title, "author_name": author, "type": "video"})
 
     def _write(self, yid: str) -> None:
         if self.info_json:

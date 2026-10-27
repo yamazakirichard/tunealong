@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { completion, suggest, titleCandidates } from "../src/lib/suggest";
+import { completion, suggest } from "../src/lib/suggest";
 
 const artists = ["Black Sabbath", "Blur", "The Black Keys", "Beyoncé", "AC/DC", "blur"];
 
@@ -41,21 +41,5 @@ describe("completion", () => {
     expect(completion("Blur", "Blur")).toBe("");
     expect(completion("", "Blur")).toBe("");
     expect(completion("x", undefined)).toBe("");
-  });
-});
-
-describe("titleCandidates", () => {
-  const songs = [
-    { title: "War Pigs", artist_id: 2 },
-    { title: "Paranoid", artist_id: 1 },
-    { title: "Loose", artist_id: null },
-  ];
-
-  it("lists the artist's songs first", () => {
-    expect(titleCandidates(songs, 1)).toEqual(["Paranoid", "War Pigs", "Loose"]);
-  });
-
-  it("keeps library order with no artist", () => {
-    expect(titleCandidates(songs, undefined)).toEqual(["War Pigs", "Paranoid", "Loose"]);
   });
 });

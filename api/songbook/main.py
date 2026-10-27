@@ -11,7 +11,7 @@ from starlette.routing import Mount, Route
 
 from . import config, db
 from .auth import BasicAuth
-from .routes import groups, library, media, presets, songs
+from .routes import groups, library, media, presets, songs, youtube
 
 
 def create_app(settings: config.Settings | None = None):
@@ -55,7 +55,7 @@ def _build(settings: config.Settings) -> FastAPI:
         request.app.state.db.execute("SELECT 1").fetchone()
         return {"status": "ok"}
 
-    for module in (songs, presets, groups, library, media):
+    for module in (songs, presets, groups, library, media, youtube):
         app.include_router(module.router)
 
     # The built UI (web/dist), served last so the API routes win. The UI uses

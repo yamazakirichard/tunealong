@@ -2,7 +2,6 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, errorText, type Song } from "../lib/api";
 import { useLibrary } from "../lib/library";
-import { useSongTitles } from "../lib/useSongTitles";
 import CategoryPicker from "./categoryPicker";
 import SmallDialog, { buttonClass, inputClass, plainButtonClass } from "./dialog";
 import SuggestInput from "./suggestInput";
@@ -22,7 +21,6 @@ export function EditSongDialog({ song, focus, onClose, onCategoryCreated }: {
   const [cats, setCats] = useState<number[]>([]);
   const artistRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const titles = useSongTitles(song !== null, lib.artists, artist);
 
   useEffect(() => {
     if (!song) return;
@@ -57,7 +55,7 @@ export function EditSongDialog({ song, focus, onClose, onCategoryCreated }: {
         )}
         <label className="text-sm flex flex-col gap-1">
           Title
-          <SuggestInput ref={titleRef} name="title" required value={title} onChange={setTitle} candidates={titles} />
+          <input ref={titleRef} name="title" required className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
         <label className="text-sm flex flex-col gap-1">
           Artist <span className="text-xs text-theme-500">blank = Unsorted; a new name creates the artist</span>

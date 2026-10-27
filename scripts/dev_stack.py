@@ -75,7 +75,7 @@ def main() -> None:
     metube.__enter__()
 
     web_dir = HERE / "web" / "dist"
-    settings = dataclasses.replace(settings, metube_url=metube.url, web_dir=web_dir,
+    settings = dataclasses.replace(settings, metube_url=metube.url, oembed_url=f"{metube.url}/oembed", web_dir=web_dir,
                                    download_poll_s=0.1, worker_idle_s=0.1)
     worker = Worker(settings)
     threading.Thread(target=worker.run_forever, daemon=True).start()

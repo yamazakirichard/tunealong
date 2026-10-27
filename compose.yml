@@ -22,6 +22,7 @@ services:
     environment:
       <<: *ids
       METUBE_URL: ${METUBE_URL:-http://metube:8081}
+      SONGBOOK_OEMBED_URL: ${SONGBOOK_OEMBED_URL-https://www.youtube.com/oembed}
       SONGBOOK_BASE_PATH: ${SONGBOOK_BASE_PATH:-}
       SONGBOOK_AUTH_USER: ${SONGBOOK_AUTH_USER:-}
       SONGBOOK_AUTH_PASSWORD_HASH: ${SONGBOOK_AUTH_PASSWORD_HASH:-}

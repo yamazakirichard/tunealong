@@ -10,7 +10,9 @@ A self-hosted library for playing along to songs downloaded from YouTube.
 - Saved presets are rendered once with Rubber Band (pitch and tempo; the video
   is retimed, never re-encoded) and cached, so next time they play instantly
   at full quality. While you experiment, a lighter live preview plays.
-- Paste a YouTube URL to add a song. The same video is never downloaded twice.
+- Paste a YouTube URL to add a song. Artist and title are guessed from the
+  video's YouTube title (`SONGBOOK_OEMBED_URL=` turns that off). The same video
+  is never downloaded twice.
 
 It runs as three containers: `api` (web UI and API on one port), `worker`
 (downloads, renders, library scans) and a bundled

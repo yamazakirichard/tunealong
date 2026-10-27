@@ -10,6 +10,7 @@ class Settings:
     root: Path
     busy_timeout_ms: int = 5000
     metube_url: str = "http://metube:8081"
+    oembed_url: str = "https://www.youtube.com/oembed"  # "" turns the Add song title guess off
     download_timeout_s: float = 900.0
     download_poll_s: float = 2.0
     scan_interval_s: float = 300.0
@@ -49,6 +50,7 @@ def load() -> Settings:
         root=Path(os.environ.get("SONGBOOK_ROOT", "/srv/songbook")).resolve(),
         busy_timeout_ms=int(os.environ.get("SONGBOOK_DB_BUSY_TIMEOUT_MS", "5000")),
         metube_url=os.environ.get("METUBE_URL", "http://metube:8081").rstrip("/"),
+        oembed_url=os.environ.get("SONGBOOK_OEMBED_URL", "https://www.youtube.com/oembed").strip(),
         download_timeout_s=float(os.environ.get("SONGBOOK_DOWNLOAD_TIMEOUT_S", "900")),
         download_poll_s=float(os.environ.get("SONGBOOK_DOWNLOAD_POLL_S", "2")),
         scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),

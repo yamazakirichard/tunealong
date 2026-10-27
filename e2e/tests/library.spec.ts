@@ -89,9 +89,8 @@ test("moving a song to another artist sticks after a reload", async ({ page, req
   await expect(group.locator(`[data-testid=song-card][data-name='${A}']`)).toBeVisible();
 });
 
-test("artist and title fields suggest what's already in the library", async ({ page, request }) => {
-  const sabbath = await createArtist(request, "Black Sabbath");
-  await request.patch(`api/songs/${await songId(request, A)}`, { data: { artist_id: sabbath, title: "Paranoid" } });
+test("the artist field suggests artists already in the library", async ({ page, request }) => {
+  await createArtist(request, "Black Sabbath");
   await page.goto("./");
   await page.getByRole("button", { name: "Add song" }).click();
   const dlg = page.getByRole("dialog", { name: "Add song" });
@@ -99,21 +98,45 @@ test("artist and title fields suggest what's already in the library", async ({ p
   // The best match shows greyed after the cursor; Tab takes it.
   const artist = dlg.getByLabel("Artist");
   await artist.pressSequentially("black s");
-  await expect(dlg.getByTestId("suggest-ghost").first()).toContainText("abbath");
+  await expect(dlg.getByTestId("suggest-ghost")).toContainText("abbath");
   await artist.press("Tab");
   await expect(artist).toHaveValue("Black Sabbath");
 
-  // Titles come from the library; Escape closes the list but not the dialog.
-  const title = dlg.getByLabel("Title");
-  await title.pressSequentially("par");
-  await expect(dlg.getByRole("option", { name: "Paranoid" })).toBeVisible();
-  await title.press("Escape");
+  // Escape closes the list but not the dialog; arrows and Enter pick from it.
+  await artist.fill("");
+  await artist.pressSequentially("sabb");
+  await expect(dlg.getByRole("option", { name: "Black Sabbath" })).toBeVisible();
+  await artist.press("Escape");
   await expect(dlg.getByRole("listbox")).toBeHidden();
   await expect(dlg.getByLabel("YouTube URL")).toBeVisible();
-  await title.press("ArrowDown");
-  await title.press("Enter");
+  await artist.press("ArrowDown");
+  await artist.press("Enter");
+  await expect(artist).toHaveValue("Black Sabbath");
+});
+
+test("pasting a URL guesses artist and title from the YouTube title", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Add song" }).click();
+  const dlg = page.getByRole("dialog", { name: "Add song" });
+  const url = dlg.getByLabel("YouTube URL");
+  const artist = dlg.getByLabel("Artist");
+  const title = dlg.getByLabel("Title");
+
+  // The fake oEmbed calls Pzzzzzzzzzz "Black Sabbath - Paranoid (Official Video)".
+  await url.fill("https://youtu.be/Pzzzzzzzzzz");
+  await expect(dlg.getByTestId("youtube-title")).toHaveText("YouTube: Black Sabbath - Paranoid (Official Video) · BlackSabbathVEVO");
+  await expect(artist).toHaveValue("Black Sabbath");
   await expect(title).toHaveValue("Paranoid");
-  await expect(dlg.getByLabel("YouTube URL")).toBeVisible();
+
+  // A title you typed yourself survives a new lookup; a guessed artist is replaced.
+  await title.fill("My Paranoid");
+  await url.fill("https://youtu.be/E0ozmU9cJDg");
+  await expect(dlg.getByTestId("youtube-title")).toContainText("YouTube title E0ozmU9cJDg");
+  await expect(artist).toHaveValue("");
+  await expect(title).toHaveValue("My Paranoid");
+
+  await dlg.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(card(page, "My Paranoid")).toBeVisible({ timeout: 20_000 });
 });
 
 test("dragging a song onto another artist group moves it", async ({ page, request }) => {
