@@ -53,6 +53,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const modalRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const graphRef = useRef<Graph | null>(null);
+  // A saved A is where the song starts, B or no B: seek there once the media can take it (original timeline).
+  const startAt = useRef<number | null>(null);
 
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetId, setPresetId] = useState<number | null>(null);
@@ -142,6 +144,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         setLoopA(pb.loop_a);
         setLoopB(pb.loop_b);
         setLoopOn(pb.loop_a !== null && pb.loop_b !== null);
+        startAt.current = pb.loop_a;
         applyPlayback(pb, p);
       } catch (e) {
         toast({ text: errorText(e), kind: "error" });
@@ -210,9 +213,15 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     const check = () => {
       if (stop) return;
       const { loopOn: on, loopA: a, loopB: b, loaded: l } = live.current;
-      if (on && l) {
-        const seek = loopSeek(video.currentTime, a, b, l.timeScale);
-        if (seek !== null) video.currentTime = seek;
+      // Wait for metadata: until then a new source sits at 0 and would be pulled to A before load() restores its position.
+      if (l && video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        if (startAt.current !== null) {
+          video.currentTime = startAt.current * l.timeScale;
+          startAt.current = null;
+        } else if (on) {
+          const seek = loopSeek(video.currentTime, a, b, l.timeScale);
+          if (seek !== null) video.currentTime = seek;
+        }
       }
       schedule();
     };
@@ -256,6 +265,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
+      const { loopA: a, loaded: l } = live.current;
+      if (v.ended && a !== null && l) v.currentTime = a * l.timeScale; // replay from A, not 0:00
       void graphRef.current?.ctx?.resume();
       void v.play().catch(() => {});
     } else v.pause();
@@ -281,6 +292,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     setLoopA(p.loop_a);
     setLoopB(p.loop_b);
     setLoopOn(p.loop_a !== null && p.loop_b !== null);
+    startAt.current = p.loop_a;
     try {
       applyPlayback(await api.presetPlayback(id), p);
     } catch (e) {

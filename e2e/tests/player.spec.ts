@@ -210,6 +210,38 @@ test("A/B loop keeps playback between the points", async ({ page }) => {
   expect(t).toBeLessThanOrEqual(s.loop_b + 0.1);
 });
 
+test("a saved A alone is the start point: the song reopens at A", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await page.getByTestId("player").focus();
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThan(2);
+  await page.keyboard.press("a");
+  await saveAs(page, "Late start");
+  const a = (await sb(page)).loop_a;
+  expect((await sb(page)).loop_b).toBeNull();
+  await closePlayer(page);
+
+  await openSong(page, A);
+  await expect.poll(async () => (await sb(page)).loop_a).toBe(a);
+  await expect.poll(async () => (await sb(page)).position).toBeGreaterThanOrEqual(a - 0.05);
+});
+
+test("with the loop on, seeking before A is pulled back into [A, B]", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await page.getByTestId("player").focus();
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThan(2);
+  await page.keyboard.press("a");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThan((await sb(page)).loop_a + 1.5);
+  await page.keyboard.press("b");
+  const { loop_a: a, loop_b: b } = await sb(page);
+  await page.keyboard.press("Home");
+  await page.waitForTimeout(300);
+  const p = (await sb(page)).position;
+  expect(p).toBeGreaterThanOrEqual(a - 0.05);
+  expect(p).toBeLessThanOrEqual(b + 0.1);
+});
+
 test("a saved tempo is rendered by Rubber Band: the render plays at rate 1, timeline mapped", async ({ page }) => {
   await page.goto("./");
   await openSong(page, A);

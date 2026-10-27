@@ -9,6 +9,14 @@ describe("loop", () => {
     expect(loopSeek(4, 2, 4)).toBe(2);
   });
 
+  it("jumps forward to A from before it", () => {
+    expect(loopSeek(0, 2, 4)).toBe(2);
+    expect(loopSeek(1.9, 2, 4)).toBe(2);
+    expect(loopSeek(1.97, 2, 4)).toBeNull(); // within the slack
+    expect(loopSeek(2, 2, 4)).toBeNull();
+    expect(loopSeek(0, 2, 4, 2)).toBe(4);
+  });
+
   it("scales loop points on a baked render", () => {
     expect(loopSeek(8.01, 2, 4, 2)).toBe(4);
     expect(loopSeek(7.99, 2, 4, 2)).toBeNull();

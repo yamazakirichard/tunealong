@@ -1,7 +1,10 @@
 // Loop points and positions are stored in ORIGINAL-timeline seconds. A baked
 // tempo render runs `timeScale` times longer (timeScale = 1 / tempo).
 
-/** Where to seek to, or null to keep playing. */
+// Slack below A so a seek that lands a hair early (frame rounding) doesn't re-seek.
+const BEFORE_A_SLACK = 0.05;
+
+/** Where to seek to, or null to keep playing. Outside [A, B) goes to A: past B, and before A too. */
 export function loopSeek(
   t: number,
   loopA: number | null,
@@ -9,7 +12,8 @@ export function loopSeek(
   timeScale = 1,
 ): number | null {
   if (loopA == null || loopB == null || loopB <= loopA) return null;
-  return t >= loopB * timeScale ? loopA * timeScale : null;
+  const a = loopA * timeScale;
+  return t >= loopB * timeScale || t < a - BEFORE_A_SLACK ? a : null;
 }
 
 /** Position on the media being played → original timeline. */
