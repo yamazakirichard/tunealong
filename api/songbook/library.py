@@ -27,6 +27,13 @@ def song_dict(row: sqlite3.Row, categories: list[int] | None = None,
     return d
 
 
+def artist_image_url(row: sqlite3.Row) -> str | None:
+    """Relative, like media_url. ?v= changes whenever a new picture is fetched."""
+    if not row["image_path"]:
+        return None
+    return f"media/artists/{row['id']}?v={''.join(c for c in row['image_checked_at'] or '' if c.isdigit())}"
+
+
 def categories_by_song(conn: sqlite3.Connection, song_ids=None) -> dict[int, list[int]]:
     out: dict[int, list[int]] = {}
     q = ("SELECT sc.song_id, sc.category_id FROM song_categories sc"
@@ -84,7 +91,7 @@ def build(conn: sqlite3.Connection, group_by: str = "artist", category: int | No
     else:
         for a in conn.execute(f"SELECT * FROM artists ORDER BY {_ORDER}, name COLLATE NOCASE"):
             groups.append(_group(a["id"], a["name"], a["columns"], a["style"], a["sort_order"],
-                                 [s for s in songs if s["artist_id"] == a["id"]]))
+                                 [s for s in songs if s["artist_id"] == a["id"]], image_url=artist_image_url(a)))
         groups.append(_group(None, UNSORTED, 4, "row", None, [s for s in songs if s["artist_id"] is None]))
     if filtered:
         groups = [g for g in groups if g["songs"]]

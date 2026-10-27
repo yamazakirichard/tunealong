@@ -1,7 +1,9 @@
 """A stand-in for MeTube, speaking the same /add, /history and /delete contract.
 
 It also answers YouTube's /oembed (SONGBOOK_OEMBED_URL points here in tests),
-with titles from OEMBED_TITLES or "YouTube title <id>", like its info.json.
+with titles from OEMBED_TITLES or "YouTube title <id>", like its info.json, and
+TheAudioDB's search (SONGBOOK_AUDIODB_URL=<fake>/audiodb), knowing the artists
+in AUDIODB_ARTISTS, with a tiny PNG for each.
 
 It records every /add call and, after a short delay, "downloads" by copying a
 fixture to originals/<id>.webm (temp name, then rename, like yt-dlp). It runs as
@@ -13,15 +15,17 @@ import json
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import threading
 import time
+import zlib
 from pathlib import Path
 
 import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from songbook.youtube import parse_id
@@ -31,6 +35,18 @@ from songbook.youtube import parse_id
 OEMBED_TITLES = {
     "Pzzzzzzzzzz": ("Black Sabbath - Paranoid (Official Video)", "BlackSabbathVEVO"),
 }
+
+# Names TheAudioDB "knows" (searched case-insensitively), as it spells them.
+AUDIODB_ARTISTS = ["Black Sabbath", "Fake Uploader"]
+
+
+def _png(rgb=(200, 60, 40), size=8) -> bytes:
+    """A solid-colour PNG, so the fake needs no image fixture."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    raw = b"".join(b"\0" + bytes(rgb) * size for _ in range(size))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
 class FakeMetube:
@@ -45,11 +61,15 @@ class FakeMetube:
         self.fail_status: int | None = None  # answer /add with this HTTP status
         self.yt_error: str | None = None     # accept /add, then report a failed download
         self.done: list[dict] = []
+        self.audiodb_calls: list[str] = []
+        self.audiodb_status: int | None = None  # answer TheAudioDB search with this HTTP status
         self.app = Starlette(routes=[
             Route("/add", self._add, methods=["POST"]),
             Route("/history", self._history, methods=["GET"]),
             Route("/delete", self._delete, methods=["POST"]),
             Route("/oembed", self._oembed, methods=["GET"]),
+            Route("/audiodb/search.php", self._audiodb_search, methods=["GET"]),
+            Route("/audiodb/img/{name}/small", self._audiodb_image, methods=["GET"]),
         ])
 
     @property
@@ -85,6 +105,21 @@ class FakeMetube:
             return JSONResponse({"error": "Not Found"}, status_code=404)
         title, author = OEMBED_TITLES.get(yid, (f"YouTube title {yid}", "Fake Uploader"))
         return JSONResponse({"title": title, "author_name": author, "type": "video"})
+
+    async def _audiodb_search(self, request: Request):
+        q = request.query_params.get("s", "")
+        self.audiodb_calls.append(q)
+        if self.audiodb_status:
+            return JSONResponse({}, status_code=self.audiodb_status)
+        # Fuzzy, like the real one: "Sabbath" finds Black Sabbath.
+        hits = [n for n in AUDIODB_ARTISTS if q.casefold() and q.casefold() in n.casefold()]
+        return JSONResponse({"artists": [
+            {"idArtist": str(i), "strArtist": n, "strArtistAlternate": "",
+             "strArtistThumb": f"{request.base_url}audiodb/img/{n.replace(' ', '_')}"}
+            for i, n in enumerate(hits, 1)] or None})
+
+    async def _audiodb_image(self, request: Request):
+        return Response(_png(), media_type="image/png")
 
     def _write(self, yid: str) -> None:
         if self.info_json:

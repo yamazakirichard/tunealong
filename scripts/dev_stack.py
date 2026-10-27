@@ -42,7 +42,7 @@ def seed(settings: config.Settings, conn) -> None:
     for table in ("song_categories", "presets", "renders", "songs", "artists", "categories", "jobs", "ignored_paths"):
         conn.execute(f"DELETE FROM {table}")
     conn.execute("PRAGMA foreign_keys = ON")
-    for d in (settings.originals_dir, settings.renders_dir):
+    for d in (settings.originals_dir, settings.renders_dir, settings.artist_images_dir):
         shutil.rmtree(d, ignore_errors=True)
     config.ensure_dirs(settings)
     for name in SEED:
@@ -75,7 +75,8 @@ def main() -> None:
     metube.__enter__()
 
     web_dir = HERE / "web" / "dist"
-    settings = dataclasses.replace(settings, metube_url=metube.url, oembed_url=f"{metube.url}/oembed", web_dir=web_dir,
+    settings = dataclasses.replace(settings, metube_url=metube.url, oembed_url=f"{metube.url}/oembed",
+                                   audiodb_url=f"{metube.url}/audiodb", web_dir=web_dir,
                                    download_poll_s=0.1, worker_idle_s=0.1)
     worker = Worker(settings)
     threading.Thread(target=worker.run_forever, daemon=True).start()

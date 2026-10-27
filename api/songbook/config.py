@@ -11,6 +11,7 @@ class Settings:
     busy_timeout_ms: int = 5000
     metube_url: str = "http://metube:8081"
     oembed_url: str = "https://www.youtube.com/oembed"  # "" turns the Add song title guess off
+    audiodb_url: str = "https://www.theaudiodb.com/api/v1/json/123"  # "" turns artist pictures off
     download_timeout_s: float = 900.0
     download_poll_s: float = 2.0
     scan_interval_s: float = 300.0
@@ -44,6 +45,10 @@ class Settings:
     def renders_dir(self) -> Path:
         return self.root / "renders"
 
+    @property
+    def artist_images_dir(self) -> Path:
+        return self.root / "artist-images"
+
 
 def load() -> Settings:
     return Settings(
@@ -51,6 +56,7 @@ def load() -> Settings:
         busy_timeout_ms=int(os.environ.get("SONGBOOK_DB_BUSY_TIMEOUT_MS", "5000")),
         metube_url=os.environ.get("METUBE_URL", "http://metube:8081").rstrip("/"),
         oembed_url=os.environ.get("SONGBOOK_OEMBED_URL", "https://www.youtube.com/oembed").strip(),
+        audiodb_url=os.environ.get("SONGBOOK_AUDIODB_URL", "https://www.theaudiodb.com/api/v1/json/123").strip().rstrip("/"),
         download_timeout_s=float(os.environ.get("SONGBOOK_DOWNLOAD_TIMEOUT_S", "900")),
         download_poll_s=float(os.environ.get("SONGBOOK_DOWNLOAD_POLL_S", "2")),
         scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),
@@ -77,5 +83,6 @@ def normalize_base_path(raw: str) -> str:
 
 
 def ensure_dirs(settings: Settings) -> None:
-    for d in (settings.root, settings.originals_dir, settings.local_dir, settings.renders_dir):
+    for d in (settings.root, settings.originals_dir, settings.local_dir, settings.renders_dir,
+              settings.artist_images_dir):
         d.mkdir(parents=True, exist_ok=True)

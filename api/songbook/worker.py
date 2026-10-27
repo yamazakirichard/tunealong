@@ -10,7 +10,7 @@ import sqlite3
 import threading
 import time
 
-from . import cache, config, db, ingest, jobs, render
+from . import artist_images, cache, config, db, ingest, jobs, render
 from .media import YT_NAME_RE
 from .metube import MetubeClient
 
@@ -31,6 +31,7 @@ class Worker:
         self.conn = conn or db.open_db(settings.db_path, settings.busy_timeout_ms)
         self._next_scan = 0.0
         self._next_gc = 0.0
+        self._next_artist_image = 0.0
 
     def startup(self) -> None:
         with db.transaction(self.conn):
@@ -85,7 +86,7 @@ class Worker:
                 self.enqueue_scan()
             if now >= self._next_gc:
                 self.maybe_gc()
-            if not self.run_once():
+            if not self.run_once() and not self.maybe_artist_image():
                 time.sleep(self.settings.worker_idle_s)
 
     def _beat_forever(self) -> None:
@@ -113,6 +114,24 @@ class Worker:
             return
         if removed:
             log.info("cache gc removed %d file(s)", len(removed))
+
+    def maybe_artist_image(self) -> bool:
+        """Look up one artist's picture when the queue is idle. True if it did.
+
+        At most one every 2 s (TheAudioDB's free key allows 30 requests a
+        minute); with nothing to look up, check again in 10 s, and if
+        TheAudioDB is unreachable, in 10 minutes.
+        """
+        if not self.settings.audiodb_url or time.monotonic() < self._next_artist_image:
+            return False
+        try:
+            done = artist_images.fetch_one(self.conn, self.settings)
+        except Exception as e:
+            log.warning("artist picture lookup failed, retrying in 10 min: %s", e)
+            self._next_artist_image = time.monotonic() + 600
+            return False
+        self._next_artist_image = time.monotonic() + (2 if done else 10)
+        return done
 
     def _download(self, yid: str) -> None:
         if self._file_for(yid) is None:

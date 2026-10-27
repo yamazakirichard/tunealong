@@ -1,4 +1,4 @@
-# Test override: replace MeTube, and YouTube's oEmbed, with the fake from
+# Test override: replace MeTube, YouTube's oEmbed and TheAudioDB with the fake from
 # api/tests (no network, no YouTube). Used by scripts/compose_test.sh for the
 # Playwright smoke run.
 #   docker compose -f compose.yml -f compose.fake-metube.yml up -d
@@ -6,6 +6,9 @@ services:
   api:
     environment:
       SONGBOOK_OEMBED_URL: http://metube:8081/oembed
+  worker:
+    environment:
+      SONGBOOK_AUDIODB_URL: http://metube:8081/audiodb
   metube:
     image: songbook:test
     build:

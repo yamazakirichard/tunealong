@@ -3,7 +3,8 @@
  * Copyright (C) the Homepage contributors. GPL-3.0; see NOTICE.
  * Changes: groups are artists or categories from /api/library; per-group
  * columns/style come from the artist; subgroups, icons and the height
- * animation removed; group settings, drop targets and group drag added.
+ * animation removed; group settings, drop targets and group drag added;
+ * artist groups show the artist's picture.
  */
 import { Disclosure, DisclosureButton, DisclosurePanel, Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import classNames from "classnames";
@@ -73,6 +74,7 @@ export default function ServicesGroup({ group, index, count }: { group: Group; i
                   <MdDragIndicator />
                 </span>
               )}
+              {group.image_url && <ArtistImage key={group.image_url} src={group.image_url} />}
               {group.colour && <span className="mr-2 inline-block w-3 h-3 rounded-full" style={{ backgroundColor: group.colour }} />}
               <DisclosureButton className="flex flex-1 select-none items-center">
                 <h2 className="flex text-theme-800 dark:text-theme-300 text-xl font-medium service-group-name">
@@ -98,6 +100,21 @@ export default function ServicesGroup({ group, index, count }: { group: Group; i
         )}
       </Disclosure>
     </div>
+  );
+}
+
+function ArtistImage({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      data-testid="artist-image"
+      className="mr-2 w-7 h-7 shrink-0 rounded-full object-cover bg-theme-200 dark:bg-theme-700"
+      onError={() => setBroken(true)}
+    />
   );
 }
 

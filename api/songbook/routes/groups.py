@@ -4,8 +4,9 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from .. import db
-from ..deps import get_conn
+from .. import artist_images, config, db
+from ..deps import get_conn, get_settings
+from ..guess import _squash
 from ..models import ArtistIn, ArtistPatch, CategoryIn, CategoryPatch, Reorder
 
 router = APIRouter(prefix="/api")
@@ -58,14 +59,24 @@ def create_artist(body: ArtistIn, conn: sqlite3.Connection = Depends(get_conn)) 
 
 
 @router.patch("/artists/{artist_id}")
-def patch_artist(artist_id: int, body: ArtistPatch, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
+def patch_artist(artist_id: int, body: ArtistPatch, conn: sqlite3.Connection = Depends(get_conn),
+                 settings: config.Settings = Depends(get_settings)) -> dict:
     _not_null(body, "name", "columns", "style")
-    return _patch(conn, "artists", artist_id, body.model_dump(exclude_unset=True))
+    old = conn.execute("SELECT name FROM artists WHERE id = ?", (artist_id,)).fetchone()
+    out = _patch(conn, "artists", artist_id, body.model_dump(exclude_unset=True))
+    if old and _squash(old["name"]) != _squash(out["name"]):
+        artist_images.clear(conn, settings, artist_id)  # a different artist now: the worker looks it up again
+        out = dict(conn.execute("SELECT * FROM artists WHERE id = ?", (artist_id,)).fetchone())
+    return out
 
 
 @router.delete("/artists/{artist_id}", status_code=204)
-def delete_artist(artist_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
-    return _delete(conn, "artists", artist_id)  # its songs go to Unsorted (ON DELETE SET NULL)
+def delete_artist(artist_id: int, conn: sqlite3.Connection = Depends(get_conn),
+                  settings: config.Settings = Depends(get_settings)) -> Response:
+    row = conn.execute("SELECT image_path FROM artists WHERE id = ?", (artist_id,)).fetchone()
+    resp = _delete(conn, "artists", artist_id)  # its songs go to Unsorted (ON DELETE SET NULL)
+    artist_images.remove_file(settings, row and row["image_path"])
+    return resp
 
 
 @router.get("/categories")

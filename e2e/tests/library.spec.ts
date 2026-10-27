@@ -27,6 +27,20 @@ test("artists render as groups; columns=2 lays items out in 2 columns", async ({
   expect(a!.width).toBeGreaterThan(400); // two columns of a ~1370px page, not four
 });
 
+test("an artist TheAudioDB knows gets its picture beside the name", async ({ page, request }) => {
+  await createArtist(request, "Black Sabbath"); // known to the fake TheAudioDB
+  await createArtist(request, "Unknown To AudioDB");
+  await page.goto("./");
+  const pic = page.locator("[data-testid=group][data-group-name='Black Sabbath'] [data-testid=artist-image]");
+  // The worker looks artists up when idle; reload until it has.
+  await expect(async () => {
+    await page.reload();
+    await expect(pic).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 30_000 });
+  expect(await pic.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.locator("[data-testid=group][data-group-name='Unknown To AudioDB'] [data-testid=artist-image]")).toHaveCount(0);
+});
+
 test("pasting an existing song's URL shows the duplicate toast and creates no job", async ({ page, request }) => {
   await page.goto("./");
   await page.getByRole("button", { name: "Add song" }).click();

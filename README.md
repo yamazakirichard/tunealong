@@ -13,6 +13,9 @@ A self-hosted library for playing along to songs downloaded from YouTube.
 - Paste a YouTube URL to add a song. Artist and title are guessed from the
   video's YouTube title (`SONGBOOK_OEMBED_URL=` turns that off). The same video
   is never downloaded twice.
+- Each artist's picture is shown beside their name. The worker looks every
+  artist up once on [TheAudioDB](https://www.theaudiodb.com) and keeps the
+  picture in `data/artist-images/` (`SONGBOOK_AUDIODB_URL=` turns that off).
 
 It runs as three containers: `api` (web UI and API on one port), `worker`
 (downloads, renders, library scans) and a bundled
@@ -34,6 +37,7 @@ data/
 ├── songbook.sqlite        the library: songs, artists, categories, presets
 ├── originals/             downloaded and imported media (MeTube writes here)
 ├── renders/               pitch/tempo renders: a disposable cache
+├── artist-images/         artist pictures from TheAudioDB
 └── metube-state/          MeTube's queue
 ```
 
@@ -77,7 +81,8 @@ docker compose run --rm -v /path/to/old/downloads:/import:ro api \
 
 ## Backups
 
-Back up `data/originals/` and `data/songbook.sqlite`. **Leave out
+Back up `data/originals/`, `data/songbook.sqlite` and `data/artist-images/`
+(small; the database records which artists already have one). **Leave out
 `data/renders/`**: it's a cache that rebuilds itself as songs are played.
 For a consistent copy of the database while the app is running, use
 `sqlite3 data/songbook.sqlite ".backup songbook-backup.sqlite"`.

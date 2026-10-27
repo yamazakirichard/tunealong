@@ -19,7 +19,7 @@ _TYPES = {".webm": "video/webm", ".mp4": "video/mp4", ".mkv": "video/x-matroska"
           ".mp3": "audio/mpeg", ".m4a": "audio/mp4"}
 
 
-def _file(settings: config.Settings, base: Path, rel: str | None) -> FileResponse:
+def _file(settings: config.Settings, base: Path, rel: str | None, headers: dict | None = None) -> FileResponse:
     if not rel:
         raise HTTPException(404)
     try:
@@ -29,7 +29,7 @@ def _file(settings: config.Settings, base: Path, rel: str | None) -> FileRespons
     if not path.is_relative_to(base.resolve()) or not path.is_file():
         raise HTTPException(404)
     media_type = _TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 def _id(raw: str) -> int:
@@ -53,3 +53,12 @@ def render(render_id: str, conn: sqlite3.Connection = Depends(get_conn),
     resp = _file(settings, settings.renders_dir, row and row[0])
     conn.execute("UPDATE renders SET last_used_at = datetime('now') WHERE id = ?", (rid,))
     return resp
+
+
+@router.get("/artists/{artist_id}")
+def artist_image(artist_id: str, conn: sqlite3.Connection = Depends(get_conn),
+                 settings: config.Settings = Depends(get_settings)) -> FileResponse:
+    row = conn.execute("SELECT image_path FROM artists WHERE id = ?", (_id(artist_id),)).fetchone()
+    # The URL carries ?v=<when it was fetched>, so a new picture gets a new URL.
+    return _file(settings, settings.artist_images_dir, row and row[0],
+                 headers={"Cache-Control": "private, max-age=2592000, immutable"})

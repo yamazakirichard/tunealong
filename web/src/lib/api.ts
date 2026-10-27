@@ -39,6 +39,7 @@ export interface Group {
   style: "row" | "column";
   sort_order: number | null;
   colour?: string | null;
+  image_url?: string | null; // artist groups: a picture from TheAudioDB, once the worker has one
   songs: Song[];
 }
 

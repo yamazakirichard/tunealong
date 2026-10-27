@@ -24,6 +24,8 @@ ALLOWED_DOMAINS = {
     # parsed or produced by songbook/youtube.py and songbook/metube.py
     "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
     "youtube-nocookie.com", "www.youtube-nocookie.com", "notyoutube.com", "vimeo.com",  # last two: test negatives
+    # artist pictures (songbook/config.py)
+    "www.theaudiodb.com",
     # credits and references in comments
     "github.com", "registry.npmjs.org", "mcr.microsoft.com", "ghcr.io", "fsf.org", "gnu.org", "www.gnu.org",
     "example.com",
