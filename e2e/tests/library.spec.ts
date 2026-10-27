@@ -89,6 +89,33 @@ test("moving a song to another artist sticks after a reload", async ({ page, req
   await expect(group.locator(`[data-testid=song-card][data-name='${A}']`)).toBeVisible();
 });
 
+test("artist and title fields suggest what's already in the library", async ({ page, request }) => {
+  const sabbath = await createArtist(request, "Black Sabbath");
+  await request.patch(`api/songs/${await songId(request, A)}`, { data: { artist_id: sabbath, title: "Paranoid" } });
+  await page.goto("./");
+  await page.getByRole("button", { name: "Add song" }).click();
+  const dlg = page.getByRole("dialog", { name: "Add song" });
+
+  // The best match shows greyed after the cursor; Tab takes it.
+  const artist = dlg.getByLabel("Artist");
+  await artist.pressSequentially("black s");
+  await expect(dlg.getByTestId("suggest-ghost").first()).toContainText("abbath");
+  await artist.press("Tab");
+  await expect(artist).toHaveValue("Black Sabbath");
+
+  // Titles come from the library; Escape closes the list but not the dialog.
+  const title = dlg.getByLabel("Title");
+  await title.pressSequentially("par");
+  await expect(dlg.getByRole("option", { name: "Paranoid" })).toBeVisible();
+  await title.press("Escape");
+  await expect(dlg.getByRole("listbox")).toBeHidden();
+  await expect(dlg.getByLabel("YouTube URL")).toBeVisible();
+  await title.press("ArrowDown");
+  await title.press("Enter");
+  await expect(title).toHaveValue("Paranoid");
+  await expect(dlg.getByLabel("YouTube URL")).toBeVisible();
+});
+
 test("dragging a song onto another artist group moves it", async ({ page, request }) => {
   await createArtist(request, "Target");
   await page.goto("./");

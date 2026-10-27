@@ -2,8 +2,10 @@ import { type FormEvent, useState } from "react";
 
 import { api, errorText, type Song } from "../lib/api";
 import { useLibrary } from "../lib/library";
+import { useSongTitles } from "../lib/useSongTitles";
 import CategoryPicker from "./categoryPicker";
 import SmallDialog, { buttonClass, inputClass, plainButtonClass } from "./dialog";
+import SuggestInput from "./suggestInput";
 import { useToast } from "./toasts";
 
 export default function AddSong({ open, onClose, onCategoryCreated }: {
@@ -18,6 +20,7 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
   const [title, setTitle] = useState("");
   const [cats, setCats] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
+  const titles = useSongTitles(open, lib.artists, artist);
 
   const reset = () => {
     setUrl("");
@@ -73,16 +76,11 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
         </label>
         <label className="text-sm flex flex-col gap-1">
           Artist <span className="text-xs text-theme-500">optional; blank goes to Unsorted</span>
-          <input name="artist" list="artist-names" className={inputClass} value={artist} onChange={(e) => setArtist(e.target.value)} />
-          <datalist id="artist-names">
-            {lib.artists.map((a) => (
-              <option key={a.id} value={a.name} />
-            ))}
-          </datalist>
+          <SuggestInput name="artist" value={artist} onChange={setArtist} candidates={lib.artists.map((a) => a.name)} />
         </label>
         <label className="text-sm flex flex-col gap-1">
           Title <span className="text-xs text-theme-500">optional; defaults to the YouTube title</span>
-          <input name="title" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <SuggestInput name="title" value={title} onChange={setTitle} candidates={titles} />
         </label>
         <CategoryPicker categories={lib.categories} value={cats} onChange={setCats} onCreated={onCategoryCreated} />
         <div className="flex justify-end gap-2">

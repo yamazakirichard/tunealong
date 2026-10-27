@@ -202,3 +202,8 @@ Judgement calls made during implementation, newest last.
   - Both "Save preset" and "Save as…" send `is_default: true`, and the API's existing one-default rule clears the previous one. The checkbox is gone.
   - So the song never gets stuck opening shifted, an **"Open at original"** button appears next to the preset selector whenever the song has a default. It clears the default (`is_default: false`) and stores nothing else.
   - The API itself still defaults `is_default` to false for other clients.
+- **Artist and title suggest as you type** (owner's request, 2026-10-26). This replaces the native `<datalist>` on the artist field, which some browsers barely show (Firefox, phones).
+  - One component, `SuggestInput`, is used for both fields in the Add and Edit dialogs. The best prefix match shows greyed after the cursor, and Tab or → takes it. A list shows up to 6 matches, prefix matches first and then word matches ("sabb" finds "Black Sabbath"). Pick one with ↑/↓ and Enter, or click it. Matching ignores case and accents. Free text still works.
+  - Enter only picks a suggestion you've moved to with the arrows, so typing a new artist that's a prefix of an existing one ("Black" when "Black Sabbath" exists) and pressing Enter submits what you typed.
+  - Escape closes the list without closing the dialog. Headless UI's Dialog ignores an Escape whose default was prevented.
+  - Title suggestions come from every song in the library, not the page's filtered view. The dialog loads the whole library when it opens. When the artist field names an existing artist, that artist's titles come first.
