@@ -1,4 +1,4 @@
-// <video> → MediaElementSource → SoundTouch worklet (pitch only) → speakers.
+// <video> → MediaElementSource → SoundTouch worklet (pitch only) → gain (volume) → speakers.
 //
 // A MediaElementSource can be created only once per element, so the player
 // mounts a fresh <video> on every open and calls teardown() on close.
@@ -14,6 +14,9 @@ export interface Graph {
   kind: "worklet" | "direct";
   setPitch: (semitones: number) => void;
   pitch: () => number;
+  /** Output gain, 0..1. Without a context it's the element's own volume. */
+  setVolume: (gain: number) => void;
+  volume: () => number;
   teardown: () => Promise<void>;
 }
 
@@ -21,12 +24,14 @@ export const graphErrors: string[] = [];
 
 export async function buildGraph(video: HTMLVideoElement): Promise<Graph> {
   let pitch = 0;
-  const direct = (ctx: AudioContext | null = null): Graph => ({
+  const direct = (ctx: AudioContext | null = null, gain: GainNode | null = null): Graph => ({
     ctx,
     node: null,
     kind: "direct",
     setPitch: (s) => (pitch = s),
     pitch: () => pitch,
+    setVolume: (g) => (gain ? gain.gain.setValueAtTime(g, ctx!.currentTime) : (video.volume = g)),
+    volume: () => (gain ? gain.gain.value : video.volume),
     teardown: async () => {
       await ctx?.close().catch(() => {});
     },
@@ -43,11 +48,13 @@ export async function buildGraph(video: HTMLVideoElement): Promise<Graph> {
     await ctx.close().catch(() => {});
     return direct();
   }
+  const gain = ctx.createGain();
+  gain.connect(ctx.destination);
   try {
     await SoundTouchNode.register(ctx, processorUrl);
     const node = new SoundTouchNode({ context: ctx });
     source.connect(node);
-    node.connect(ctx.destination);
+    node.connect(gain);
     if (ctx.state === "suspended") await ctx.resume().catch(() => {});
     return {
       ctx,
@@ -55,16 +62,19 @@ export async function buildGraph(video: HTMLVideoElement): Promise<Graph> {
       kind: "worklet",
       setPitch: (s) => node.pitchSemitones.setValueAtTime(s, ctx.currentTime),
       pitch: () => node.pitchSemitones.value,
+      setVolume: (g) => gain.gain.setValueAtTime(g, ctx.currentTime),
+      volume: () => gain.gain.value,
       teardown: async () => {
         source.disconnect();
         node.disconnect();
+        gain.disconnect();
         await ctx.close().catch(() => {});
       },
     };
   } catch (e) {
     // The element is already captured by the context, so route it straight out.
     graphErrors.push(`${(e as Error).name}: ${(e as Error).message}`);
-    source.connect(ctx.destination);
-    return direct(ctx);
+    source.connect(gain);
+    return direct(ctx, gain);
   }
 }

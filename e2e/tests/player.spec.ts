@@ -217,6 +217,28 @@ test("on a slowed-down render the seek bar still uses the song's own timeline", 
   expect((await sb(page)).position).toBeGreaterThanOrEqual(4);
 });
 
+test("volume: the slider sets the gain, M mutes, and the level is remembered on reopen", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await expect.poll(async () => (await sb(page)).gain).toBe(1);
+  const slider = page.getByRole("slider", { name: "Volume" });
+  await slider.fill("0.5");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.25, 3); // squared
+  expect((await sb(page)).graph).toBe("worklet");
+
+  await page.getByTestId("player").focus();
+  await page.keyboard.press("m");
+  await expect.poll(async () => (await sb(page)).gain).toBe(0);
+  await expect(page.getByRole("button", { name: "Unmute (M)" })).toBeVisible();
+  await page.keyboard.press("m");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.25, 3);
+
+  await closePlayer(page);
+  await openSong(page, A);
+  await expect(slider).toHaveValue("0.5");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.25, 3);
+});
+
 test("F toggles fullscreen on the modal, not a new tab", async ({ page, context }) => {
   await page.goto("./");
   await openSong(page, A);

@@ -207,6 +207,10 @@ Judgement calls made during implementation, newest last.
   - The confirm is an overlay inside the player, like the Save dialog. A Headless UI dialog would portal outside the player and be invisible in fullscreen.
   - After a delete, the player goes back to the original. Deleting the default leaves the song with none; no older preset is promoted. The render stays cached until GC.
   - No keyboard shortcut. Escape in either dialog closes only the dialog (it stops propagation, since React re-renders before the player's document listener sees the key).
+- **Volume control** (owner's request, 2026-11-01): a mute button and slider right after Play, and M toggles mute.
+  - It's a GainNode after the SoundTouch worklet. Without an AudioContext (no secure origin) it falls back to the element's own volume.
+  - The slider is squared into the gain, so its middle sounds like about half volume.
+  - Volume and mute are this browser's (localStorage), not part of a preset: the right level depends on the speakers, not the song.
 - **The artist field suggests as you type** (owner's request, 2026-10-26). This replaces the native `<datalist>`, which some browsers barely show (Firefox, phones).
   - `SuggestInput` is used for the artist field in the Add and Edit dialogs. The best prefix match shows greyed after the cursor, and Tab or → takes it. A list shows up to 6 matches, prefix matches first and then word matches ("sabb" finds "Black Sabbath"). Pick one with ↑/↓ and Enter, or click it. Matching ignores case and accents. Free text still works.
   - Enter only picks a suggestion you've moved to with the arrows, so typing a new artist that's a prefix of an existing one ("Black" when "Black Sabbath" exists) and pressing Enter submits what you typed.

@@ -1,12 +1,24 @@
 import classNames from "classnames";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { MdClose, MdDeleteOutline, MdFullscreen, MdFullscreenExit, MdPause, MdPlayArrow, MdRepeat } from "react-icons/md";
+import {
+  MdClose,
+  MdDeleteOutline,
+  MdFullscreen,
+  MdFullscreenExit,
+  MdPause,
+  MdPlayArrow,
+  MdRepeat,
+  MdVolumeDown,
+  MdVolumeOff,
+  MdVolumeUp,
+} from "react-icons/md";
 
 import { api, errorText, type Playback, type Preset, type Song } from "../lib/api";
 import { buildGraph, type Graph, graphErrors } from "../lib/audioGraph";
 import { isIdentity } from "../lib/cacheKey";
 import { useLibrary } from "../lib/library";
 import { loopSeek, mapPosition } from "../lib/loop";
+import * as prefs from "../lib/prefs";
 import { clampPitch, clampTempo, shortcut, TEMPO_MAX, TEMPO_MIN } from "../lib/shortcuts";
 import { buttonClass, inputClass, plainButtonClass } from "./dialog";
 import { useToast } from "./toasts";
@@ -70,6 +82,9 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [controlsVisible, setControlsVisible] = useState(true);
   const [saveMode, setSaveMode] = useState<"save" | "save-as" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Volume is this browser's, not the preset's: it depends on the speakers, not the song.
+  const [volume, setVolume] = useState(() => prefs.load("volume", 1));
+  const [muted, setMuted] = useState(() => prefs.load("muted", false));
   const [graphKind, setGraphKind] = useState<"worklet" | "direct" | "none">("none");
   // Position and length on the ORIGINAL timeline (like loop points), so 1:30 is
   // the same spot in the song whichever render is playing.
@@ -175,6 +190,13 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     video.playbackRate = r2(loaded.bakedTempo ? tempo / loaded.bakedTempo : tempo);
     graphRef.current?.setPitch(r2(semitones - loaded.bakedSemitones));
   }, [semitones, tempo, loaded, graphKind]);
+
+  // Squared, so the slider's middle sounds like half volume rather than nearly full.
+  useEffect(() => {
+    graphRef.current?.setVolume(muted ? 0 : volume * volume);
+  }, [volume, muted, graphKind]);
+  useEffect(() => prefs.save("volume", volume), [volume]);
+  useEffect(() => prefs.save("muted", muted), [muted]);
 
   // --- waiting for a render -------------------------------------------------
 
@@ -426,6 +448,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       if (r.effect === "set-a") setA();
       if (r.effect === "set-b") setB();
       if (r.effect === "fullscreen") toggleFullscreen();
+      if (r.effect === "toggle-mute") setMuted((m) => !m);
       if (r.effect && typeof r.effect === "object") {
         const v = videoRef.current;
         const scale = live.current.loaded?.timeScale ?? 1;
@@ -477,6 +500,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       get src() {
         return v?.currentSrc;
       },
+      get gain() {
+        return graphRef.current?.volume() ?? null;
+      },
+      volume,
+      muted,
       get audioState() {
         return graphRef.current?.ctx?.state ?? "none";
       },
@@ -610,6 +638,25 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           <button type="button" className={ctl} onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <MdPause /> : <MdPlayArrow />}
           </button>
+
+          <div className="flex items-center gap-1" role="group" aria-label="Volume">
+            <button type="button" className={ctl} onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute (M)" : "Mute (M)"}>
+              {muted || volume === 0 ? <MdVolumeOff /> : volume < 0.5 ? <MdVolumeDown /> : <MdVolumeUp />}
+            </button>
+            <input
+              type="range"
+              aria-label="Volume"
+              min={0}
+              max={1}
+              step={0.01}
+              value={muted ? 0 : volume}
+              onChange={(e) => {
+                setVolume(Number(e.target.value));
+                setMuted(false);
+              }}
+              className="w-24 accent-theme-400"
+            />
+          </div>
 
           <label className="flex items-center gap-1">
             Preset

@@ -18,6 +18,7 @@ export type Effect =
   | "set-a"
   | "set-b"
   | "fullscreen"
+  | "toggle-mute"
   | { seekBy: number }
   | { seekTo: number }
   | null;
@@ -51,6 +52,9 @@ export function shortcut(state: Controls, key: string): { state: Controls; effec
     case "f":
     case "F":
       return { state, effect: "fullscreen" };
+    case "m":
+    case "M":
+      return { state, effect: "toggle-mute" };
     case "ArrowLeft":
       return { state, effect: { seekBy: -SEEK_STEP } };
     case "ArrowRight":

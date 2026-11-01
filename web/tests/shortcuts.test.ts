@@ -45,6 +45,8 @@ describe("shortcut reducer", () => {
     ["B", "set-b"],
     ["f", "fullscreen"],
     ["F", "fullscreen"],
+    ["m", "toggle-mute"],
+    ["M", "toggle-mute"],
   ])("%j → %s, state unchanged", (key, effect) => {
     const r = apply(key);
     expect(r.effect).toBe(effect);
