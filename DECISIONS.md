@@ -218,6 +218,11 @@ Judgement calls made during implementation, newest last.
 - **Presets carry their own volume** (owner's call, 2026-11-01: one level across every song was wrong). Migration 4 adds `presets.volume` (0–1, the slider's value, NULL = none).
   - Save and Save as… store the current slider value. Loading a preset with a volume sets the slider, and changing it marks the preset unsaved. Presets saved before this (NULL) don't override, and don't show as unsaved for a volume change.
   - The browser's level (localStorage) is now the fallback: for (original), and for presets without a volume. Only changes made with no preset loaded update it, so a quiet preset doesn't make every other song quiet.
+- **Volume boost to 200%** (owner's request, 2026-11-01): the slider runs 0–2 with a mark at 100%; past it a red zone and a red thumb say it's boost.
+  - Up to 1 the slider is still squared into the gain; above 1 it's linear, so 200% is gain 2 (+6 dB). Squaring all the way would make the top +12 dB, which just clips.
+  - Nothing limits the output, so loud songs can clip when boosted. That's the trade for a simple GainNode; the red is the warning.
+  - Migration 5 widens the `presets.volume` CHECK to 0–2 (new column, copy, drop, rename — SQLite can't alter a CHECK).
+  - Without an AudioContext the element's own volume stops at 1, so the slider stops at 100% and shows no mark.
   - Mute stays this browser's and is never saved: it's a momentary thing.
 - **Fine tempo control** (owner's request, 2026-11-01): the slider's `<datalist>` tick at 1.0 made Chrome snap to it, so 0.95 couldn't be reached. The tick is gone (the "1.0×" button resets instead), the slider is wider, − / + buttons step 0.01, and the readout is a number field. Typed values commit on Enter or blur and are clamped to 0.25–2.0, and Escape reverts without closing the player. Shortcuts are ignored while typing in it.
 - **The artist field suggests as you type** (owner's request, 2026-10-26). This replaces the native `<datalist>`, which some browsers barely show (Firefox, phones).

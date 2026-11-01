@@ -258,6 +258,19 @@ test("volume: the slider sets the gain, M mutes, and the level is remembered on 
   await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.25, 3);
 });
 
+test("volume: past the 100% mark it boosts linearly up to 200%", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  const slider = page.getByRole("slider", { name: "Volume" });
+  await expect(slider).toHaveAttribute("max", "2");
+  await expect(page.getByTestId("volume-100")).toBeVisible();
+  await slider.fill("1.5");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(1.5, 3);
+  await expect(slider).toHaveAttribute("aria-valuetext", "150%");
+  await slider.fill("2");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(2, 3);
+});
+
 test("a preset keeps its own volume; the original keeps the browser's", async ({ page, request }) => {
   await page.goto("./");
   await openSong(page, A);

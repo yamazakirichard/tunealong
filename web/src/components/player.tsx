@@ -55,6 +55,10 @@ function fromPlayback(songId: number, pb: Playback, preset: Preset | null): Load
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const browserVolume = () => prefs.load("volume", 1);
+// The slider runs to 2 (200%). Up to 1 it's squared, so its middle sounds like half;
+// above 1 it's linear, so 2 is double the original level (+6 dB) and may clip.
+const VOLUME_MAX = 2;
+const gainOf = (v: number) => (v <= 1 ? v * v : v);
 
 /** The tempo readout, typeable: commits on Enter or blur, Escape reverts. */
 function TempoField({ tempo, onCommit }: { tempo: number; onCommit: (t: number) => void }) {
@@ -230,9 +234,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     graphRef.current?.setPitch(r2(semitones - loaded.bakedSemitones));
   }, [semitones, tempo, loaded, graphKind]);
 
-  // Squared, so the slider's middle sounds like half volume rather than nearly full.
   useEffect(() => {
-    graphRef.current?.setVolume(muted ? 0 : volume * volume);
+    graphRef.current?.setVolume(muted ? 0 : gainOf(volume));
   }, [volume, muted, graphKind]);
   // Only a level set without a preset becomes the browser's; a preset's stays with the preset until saved.
   useEffect(() => {
@@ -689,19 +692,33 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
             <button type="button" className={ctl} onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute (M)" : "Mute (M)"}>
               {muted || volume === 0 ? <MdVolumeOff /> : volume < 0.5 ? <MdVolumeDown /> : <MdVolumeUp />}
             </button>
-            <input
-              type="range"
-              aria-label="Volume"
-              min={0}
-              max={1}
-              step={0.01}
-              value={muted ? 0 : volume}
-              onChange={(e) => {
-                setVolume(Number(e.target.value));
-                setMuted(false);
-              }}
-              className="w-24 accent-theme-400"
-            />
+            {/* Past the mark at 100% is boost: the zone under it and the thumb go red. */}
+            <div className="relative flex items-center" title={`${Math.round((muted ? 0 : volume) * 100)}%`}>
+              <input
+                type="range"
+                aria-label="Volume"
+                aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)}%`}
+                min={0}
+                max={graphRef.current?.boost === false ? 1 : VOLUME_MAX}
+                step={0.01}
+                value={muted ? 0 : volume}
+                onChange={(e) => {
+                  setVolume(Number(e.target.value));
+                  setMuted(false);
+                }}
+                className={classNames("w-36", !muted && volume > 1 ? "accent-red-500" : "accent-theme-400")}
+              />
+              {graphRef.current?.boost !== false && (
+                <>
+                  <span aria-hidden className="pointer-events-none absolute left-1/2 right-0 -bottom-0.5 h-0.5 rounded bg-red-500/70" />
+                  <span
+                    aria-hidden
+                    data-testid="volume-100"
+                    className="pointer-events-none absolute left-1/2 top-1/2 -translate-y-1/2 h-4 w-0.5 bg-white/60"
+                  />
+                </>
+              )}
+            </div>
           </div>
 
           <label className="flex items-center gap-1">

@@ -14,9 +14,11 @@ export interface Graph {
   kind: "worklet" | "direct";
   setPitch: (semitones: number) => void;
   pitch: () => number;
-  /** Output gain, 0..1. Without a context it's the element's own volume. */
+  /** Output gain, 0..2. Without a context it's the element's own volume, which stops at 1. */
   setVolume: (gain: number) => void;
   volume: () => number;
+  /** Whether gain above 1 is possible (there's a GainNode). */
+  boost: boolean;
   teardown: () => Promise<void>;
 }
 
@@ -30,8 +32,9 @@ export async function buildGraph(video: HTMLVideoElement): Promise<Graph> {
     kind: "direct",
     setPitch: (s) => (pitch = s),
     pitch: () => pitch,
-    setVolume: (g) => (gain ? gain.gain.setValueAtTime(g, ctx!.currentTime) : (video.volume = g)),
+    setVolume: (g) => (gain ? gain.gain.setValueAtTime(g, ctx!.currentTime) : (video.volume = Math.min(g, 1))),
     volume: () => (gain ? gain.gain.value : video.volume),
+    boost: gain !== null,
     teardown: async () => {
       await ctx?.close().catch(() => {});
     },
@@ -64,6 +67,7 @@ export async function buildGraph(video: HTMLVideoElement): Promise<Graph> {
       pitch: () => node.pitchSemitones.value,
       setVolume: (g) => gain.gain.setValueAtTime(g, ctx.currentTime),
       volume: () => gain.gain.value,
+      boost: true,
       teardown: async () => {
         source.disconnect();
         node.disconnect();

@@ -71,7 +71,7 @@ class PresetIn(_Strict):
     loop_a: float | None = Field(default=None, ge=0)
     loop_b: float | None = Field(default=None, ge=0)
     is_default: bool = False
-    volume: float | None = Field(default=None, ge=0, le=1)  # None = the browser's
+    volume: float | None = Field(default=None, ge=0, le=2)  # None = the browser's
 
     @model_validator(mode="after")
     def _loop_order(self):

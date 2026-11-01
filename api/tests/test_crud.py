@@ -134,7 +134,7 @@ def test_second_default_preset_unsets_first(client, conn, lib):
 
 @pytest.mark.parametrize("body", [
     {"semitones": 13}, {"semitones": -12.5}, {"tempo": 3}, {"tempo": 0.1},
-    {"loop_a": 4, "loop_b": 2}, {"loop_a": 3, "loop_b": 3}, {"loop_a": -1}, {"volume": 1.5}, {"volume": -0.1}, {"name": ""}, {"bogus": True},
+    {"loop_a": 4, "loop_b": 2}, {"loop_a": 3, "loop_b": 3}, {"loop_a": -1}, {"volume": 2.5}, {"volume": -0.1}, {"name": ""}, {"bogus": True},
 ])
 def test_invalid_preset_is_422_and_db_unchanged(client, conn, lib, body):
     sid = lib["AAAAAAAAAAA"]

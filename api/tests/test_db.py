@@ -108,6 +108,8 @@ def test_second_default_preset_fails(conn):
     {"loop_a": 4, "loop_b": 4},
     {"loop_a": 5, "loop_b": 4},
     {"bake_tempo": 2},
+    {"volume": 2.1},
+    {"volume": -0.1},
 ])
 def test_preset_out_of_range_fails(conn, kw):
     s = add_song(conn)
@@ -118,7 +120,21 @@ def test_preset_out_of_range_fails(conn, kw):
 def test_preset_edges_are_allowed(conn):
     s = add_song(conn)
     add_preset(conn, s, "lo", semitones=-12, tempo=0.25, loop_a=0, loop_b=0.1)
-    add_preset(conn, s, "hi", semitones=12, tempo=2.0, bake_tempo=1)
+    add_preset(conn, s, "hi", semitones=12, tempo=2.0, bake_tempo=1, volume=2)
+
+
+def test_volume_boost_migration_keeps_existing_volumes(monkeypatch, settings):
+    conn = db.connect(settings.db_path)
+    all_ = db.migrations()
+    monkeypatch.setattr(db, "migrations", lambda: all_[:4])
+    db.migrate(conn)
+    s = add_song(conn)
+    add_preset(conn, s, "quiet", volume=0.4)
+    add_preset(conn, s, "plain")
+    monkeypatch.setattr(db, "migrations", lambda: all_)
+    db.migrate(conn)
+    assert dict(conn.execute("SELECT name, volume FROM presets").fetchall()) == {"quiet": 0.4, "plain": None}
+    add_preset(conn, s, "loud", volume=1.8)
 
 
 # --- cascades ---------------------------------------------------------------
