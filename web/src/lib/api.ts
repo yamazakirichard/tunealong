@@ -136,6 +136,7 @@ export const api = {
     call<Preset>("POST", `api/songs/${songId}/presets`, body),
   patchPreset: (id: number, body: Partial<Omit<Preset, "id" | "song_id" | "cache_key">>) =>
     call<Preset>("PATCH", `api/presets/${id}`, body),
+  deletePreset: (id: number) => call<void>("DELETE", `api/presets/${id}`),
   artists: () => call<Artist[]>("GET", "api/artists"),
   createArtist: (name: string) => call<Artist>("POST", "api/artists", { name }),
   patchArtist: (id: number, body: Partial<Omit<Artist, "id">>) => call<Artist>("PATCH", `api/artists/${id}`, body),

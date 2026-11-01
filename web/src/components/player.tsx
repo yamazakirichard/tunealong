@@ -1,6 +1,6 @@
 import classNames from "classnames";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { MdClose, MdFullscreen, MdFullscreenExit, MdPause, MdPlayArrow, MdRepeat } from "react-icons/md";
+import { MdClose, MdDeleteOutline, MdFullscreen, MdFullscreenExit, MdPause, MdPlayArrow, MdRepeat } from "react-icons/md";
 
 import { api, errorText, type Playback, type Preset, type Song } from "../lib/api";
 import { buildGraph, type Graph, graphErrors } from "../lib/audioGraph";
@@ -69,6 +69,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [saveMode, setSaveMode] = useState<"save" | "save-as" | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [graphKind, setGraphKind] = useState<"worklet" | "direct" | "none">("none");
   // Position and length on the ORIGINAL timeline (like loop points), so 1:30 is
   // the same spot in the song whichever render is playing.
@@ -76,8 +77,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [length, setLength] = useState(0);
 
   // Latest values for callbacks that outlive a render (rAF loop, key handler).
-  const live = useRef({ semitones, tempo, loopA, loopB, loopOn, loaded, saveMode });
-  live.current = { semitones, tempo, loopA, loopB, loopOn, loaded, saveMode };
+  const live = useRef({ semitones, tempo, loopA, loopB, loopOn, loaded, saveMode, confirmDelete });
+  live.current = { semitones, tempo, loopA, loopB, loopOn, loaded, saveMode, confirmDelete };
 
   const preset = presets.find((p) => p.id === presetId) ?? null;
   const badge = loaded?.source === "render" ? "cached" : pendingFor !== null ? "rendering…" : "original";
@@ -361,11 +362,26 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     }
   };
 
+  /** Delete the selected preset and go back to the original. No other preset is promoted to default. */
+  const deletePreset = async () => {
+    if (!preset) return;
+    try {
+      await api.deletePreset(preset.id);
+      setConfirmDelete(false);
+      setPresets((await api.song(song.id)).presets ?? []);
+      resetToOriginal();
+      toast({ text: `Deleted "${preset.name}"` });
+      void lib.refresh();
+    } catch (e) {
+      toast({ text: errorText(e), kind: "error" });
+    }
+  };
+
   // --- keyboard, focus trap, fullscreen, auto-hide --------------------------
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (live.current.saveMode) return; // the save dialog handles its own keys
+      if (live.current.saveMode || live.current.confirmDelete) return; // the dialogs handle their own keys
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
@@ -607,6 +623,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
               ))}
             </select>
           </label>
+          {preset && (
+            <button type="button" className={ctl} onClick={() => setConfirmDelete(true)} aria-label="Delete preset" title={`Delete "${preset.name}"`}>
+              <MdDeleteOutline />
+            </button>
+          )}
           {presets.some((p) => p.is_default) && (
             <button type="button" className={ctl} onClick={openAtOriginal} title="Stop opening this song with a preset">
               Open at original
@@ -678,6 +699,9 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
             onSave={save}
           />
         )}
+        {confirmDelete && preset && (
+          <DeletePresetDialog name={preset.name} onCancel={() => setConfirmDelete(false)} onDelete={deletePreset} />
+        )}
       </div>
     </div>
   );
@@ -694,7 +718,11 @@ function SaveDialog({ initialName, onCancel, onSave }: {
     if (name.trim()) onSave(name.trim());
   };
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onKeyDown={(e) => e.key === "Escape" && onCancel()}>
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onKeyDown={(e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation(); // the player would close on it too
+      onCancel();
+    }}>
       <form
         onSubmit={submit}
         role="dialog"
@@ -712,6 +740,29 @@ function SaveDialog({ initialName, onCancel, onSave }: {
           <button type="submit" className={buttonClass} disabled={!name.trim()}>Save</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function DeletePresetDialog({ name, onCancel, onDelete }: { name: string; onCancel: () => void; onDelete: () => void }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60" onKeyDown={(e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation(); // the player would close on it too
+      onCancel();
+    }}>
+      <div
+        role="dialog"
+        aria-label="Delete preset"
+        className="w-full max-w-sm rounded-lg bg-theme-50 dark:bg-theme-800 text-theme-800 dark:text-theme-100 p-5 flex flex-col gap-3"
+      >
+        <h2 className="text-lg font-semibold">Delete "{name}"?</h2>
+        <p className="text-sm">The song goes back to its original pitch and tempo. Its render stays cached until cleanup.</p>
+        <div className="flex justify-end gap-2">
+          <button type="button" autoFocus className={plainButtonClass} onClick={onCancel}>Cancel</button>
+          <button type="button" className="rounded px-3 py-1.5 text-sm font-medium bg-red-600 text-white" onClick={onDelete}>Delete</button>
+        </div>
+      </div>
     </div>
   );
 }

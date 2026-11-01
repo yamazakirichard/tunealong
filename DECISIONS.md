@@ -203,6 +203,10 @@ Judgement calls made during implementation, newest last.
   - So the song never gets stuck opening shifted, an **"Open at original"** button appears next to the preset selector whenever the song has a default. It clears the default (`is_default: false`) and stores nothing else.
   - The API itself still defaults `is_default` to false for other clients.
   - **"Save preset" updates the loaded preset only if its name is kept** (owner's report, 2026-11-01). Since a song opens with its default, a preset is nearly always loaded, so typing a new name in "Save preset" renamed and overwrote it: A Tout Le Monde lost its earlier presets that way. A new name now creates a new preset, the same as "Save as…".
+- **A trash can after the Preset selector deletes the selected preset** (owner's request, 2026-11-01). It shows only while a preset is selected, sits away from the save buttons, and asks first.
+  - The confirm is an overlay inside the player, like the Save dialog. A Headless UI dialog would portal outside the player and be invisible in fullscreen.
+  - After a delete, the player goes back to the original. Deleting the default leaves the song with none; no older preset is promoted. The render stays cached until GC.
+  - No keyboard shortcut. Escape in either dialog closes only the dialog (it stops propagation, since React re-renders before the player's document listener sees the key).
 - **The artist field suggests as you type** (owner's request, 2026-10-26). This replaces the native `<datalist>`, which some browsers barely show (Firefox, phones).
   - `SuggestInput` is used for the artist field in the Add and Edit dialogs. The best prefix match shows greyed after the cursor, and Tab or → takes it. A list shows up to 6 matches, prefix matches first and then word matches ("sabb" finds "Black Sabbath"). Pick one with ↑/↓ and Enter, or click it. Matching ignores case and accents. Free text still works.
   - Enter only picks a suggestion you've moved to with the arrows, so typing a new artist that's a prefix of an existing one ("Black" when "Black Sabbath" exists) and pressing Enter submits what you typed.

@@ -150,6 +150,43 @@ test("the most recently saved preset is what the song opens with; 'Open at origi
   expect(s.src).toContain(`/media/originals/${id}`);
 });
 
+test("the trash can deletes the selected preset after a confirm, and playback goes back to the original", async ({ page, request }) => {
+  await page.goto("./");
+  const id = await songId(request, A);
+  await openSong(page, A);
+  await expect(page.getByRole("button", { name: "Delete preset" })).toBeHidden(); // nothing selected
+  await page.getByRole("button", { name: "Pitch up 1" }).click();
+  await saveAs(page, "Keep");
+  await page.getByRole("button", { name: "Pitch up 1" }).click();
+  await saveAs(page, "Drop");
+
+  // Cancel stores nothing.
+  await page.getByRole("button", { name: "Delete preset" }).click();
+  const dlg = page.getByRole("dialog", { name: "Delete preset" });
+  await expect(dlg).toContainText('Delete "Drop"?');
+  await dlg.getByRole("button", { name: "Cancel" }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.getByTestId("player")).toBeVisible();
+  expect((await presets(request, id)).map((p: { name: string }) => p.name)).toEqual(["Drop", "Keep"]);
+
+  // Escape closes only the confirm, not the player.
+  await page.getByRole("button", { name: "Delete preset" }).click();
+  await page.keyboard.press("Escape");
+  await expect(dlg).toBeHidden();
+  await expect(page.getByTestId("player")).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete preset" }).click();
+  await dlg.getByRole("button", { name: "Delete" }).click();
+  await expect(dlg).toBeHidden();
+  await expect.poll(async () => (await presets(request, id)).map((p: { name: string; is_default: boolean }) => [p.name, p.is_default])).toEqual([
+    ["Keep", false],
+  ]);
+  const s = await sb(page);
+  expect([s.pitch, s.badge, s.presetName]).toEqual([0, "original", null]);
+  await expect(page.getByLabel("Preset", { exact: true }).locator("option")).toHaveText(["(original)", "Keep"]);
+  await expect(page.getByRole("button", { name: "Delete preset" })).toBeHidden();
+});
+
 test("the seek bar shows the position and jumps through the track", async ({ page }) => {
   await page.goto("./");
   await openSong(page, A);
