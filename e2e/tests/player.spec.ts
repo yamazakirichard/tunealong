@@ -130,6 +130,17 @@ test("the most recently saved preset is what the song opens with; 'Open at origi
   await page.getByRole("dialog", { name: "Save preset" }).getByRole("button", { name: "Save" }).click();
   await expect.poll(async () => (await presets(request, id)).find((p: { is_default: boolean }) => p.is_default)?.name).toBe("Up two");
 
+  // "Save preset" under a new name keeps the loaded one and adds another.
+  await page.getByRole("button", { name: "Save preset" }).click();
+  const dlg = page.getByRole("dialog", { name: "Save preset" });
+  await dlg.getByLabel("Name").fill("Up two again");
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await expect.poll(async () => (await presets(request, id)).map((p: { name: string }) => p.name)).toEqual([
+    "Down one",
+    "Up two",
+    "Up two again",
+  ]);
+
   await page.getByRole("button", { name: "Open at original" }).click();
   await expect.poll(async () => (await presets(request, id)).some((p: { is_default: boolean }) => p.is_default)).toBe(false);
   await closePlayer(page);

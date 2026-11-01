@@ -334,7 +334,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
   // Saving renders pitch AND tempo with Rubber Band; until that's ready the
   // live preview (SoundTouch pitch, browser tempo) keeps playing. The most
-  // recently saved preset becomes the song's default.
+  // recently saved preset becomes the song's default. "Save preset" updates the
+  // loaded preset only while its name is kept; a new name is a new preset.
   const save = async (name: string) => {
     const body = {
       name,
@@ -347,7 +348,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     };
     try {
       const saved =
-        saveMode === "save" && preset ? await api.patchPreset(preset.id, body) : await api.createPreset(song.id, body);
+        saveMode === "save" && preset && preset.name === name ? await api.patchPreset(preset.id, body) : await api.createPreset(song.id, body);
       const detail = await api.song(song.id);
       setPresets(detail.presets ?? []);
       setPresetId(saved.id);
