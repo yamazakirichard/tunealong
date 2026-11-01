@@ -60,7 +60,7 @@ export async function closePlayer(page: Page) {
 /** Save as a new preset; it becomes the song's default (the latest save always does). */
 export async function saveAs(page: Page, name: string) {
   await page.getByRole("button", { name: "Save as…" }).click();
-  const dlg = page.getByRole("dialog", { name: "Save preset" });
+  const dlg = page.getByRole("dialog", { name: "Save as new preset" });
   await dlg.getByLabel("Name").fill(name);
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(dlg).toBeHidden();

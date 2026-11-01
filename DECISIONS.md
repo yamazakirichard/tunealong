@@ -133,7 +133,7 @@ Judgement calls made during implementation, newest last.
   - Every open mounts a fresh `<video>` (React `key`) and builds a new AudioContext and graph. Close pauses, drops `src`, disconnects, closes the context, unlocks body scroll and restores focus.
   - **No `<StrictMode>`**: its double-run of effects in development would call `createMediaElementSource` twice on one element.
   - Save dialog: name, "Make this the default for this song" (unchecked for a new preset; for "Save preset" on an existing one it starts at that preset's current state, so a plain re-save doesn't silently drop the default), and "Bake tempo into the render (slow)", off by default.
-  - "Save preset" with no preset selected creates one. "Reset to original" goes back to 0 / 1.0× and the original file with no A/B (2026-11-01: a preset's loop points used to carry over), and stores nothing. Picking "(original)" does the same.
+  - "Save preset" with no preset selected creates one (superseded 2026-11-01, see Save / Save as… below). "Reset to original" goes back to 0 / 1.0× and the original file with no A/B (2026-11-01: a preset's loop points used to carry over), and stores nothing. Picking "(original)" does the same.
   - While a render is pending, the player polls `api/presets/{id}/playback` every second. When the render is ready, it swaps `src`, mapping the position by `time_scale`, and keeps playing.
   - The loop is checked every frame with `requestVideoFrameCallback`, or `requestAnimationFrame` for audio-only media or when paused. Setting A/B divides the current time by `time_scale`, so loop points stay in original-timeline seconds.
   - The controls auto-hide after 2 s without mouse movement (by opacity, not removal), and stay up while hovered or focused. F toggles fullscreen on the modal itself.
@@ -203,6 +203,10 @@ Judgement calls made during implementation, newest last.
   - So the song never gets stuck opening shifted, an **"Open at original"** button appears next to the preset selector whenever the song has a default. It clears the default (`is_default: false`) and stores nothing else.
   - The API itself still defaults `is_default` to false for other clients.
   - **"Save preset" updates the loaded preset only if its name is kept** (owner's report, 2026-11-01). Since a song opens with its default, a preset is nearly always loaded, so typing a new name in "Save preset" renamed and overwrote it: A Tout Le Monde lost its earlier presets that way. A new name now creates a new preset, the same as "Save as…".
+  - **Save and Save as… are now different actions** (owner's request, 2026-11-01), as icon buttons right after the Preset selector, followed by the trash can after a small gap.
+    - 💾 **Save** updates the selected preset in place, with no dialog. It's disabled with no preset selected. A dot on it marks unsaved changes. It stays enabled without changes, because re-saving is how an older preset becomes the default again.
+    - **Save as…** always opens the name dialog ("Save as new preset") with an empty name, and always creates a new preset.
+    - The cost: there's no rename any more (it was only reachable by retyping the name in "Save preset"). Save as… under the new name, then delete the old one.
 - **A trash can after the Preset selector deletes the selected preset** (owner's request, 2026-11-01). It shows only while a preset is selected, sits away from the save buttons, and asks first.
   - The confirm is an overlay inside the player, like the Save dialog. A Headless UI dialog would portal outside the player and be invisible in fullscreen.
   - After a delete, the player goes back to the original. Deleting the default leaves the song with none; no older preset is promoted. The render stays cached until GC.

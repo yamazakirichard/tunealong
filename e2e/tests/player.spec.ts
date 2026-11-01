@@ -126,20 +126,20 @@ test("the most recently saved preset is what the song opens with; 'Open at origi
 
   // Re-saving an older preset makes it the default again.
   await page.getByLabel("Preset", { exact: true }).selectOption({ label: "Up two" });
+  await expect(page.getByTestId("unsaved")).toBeHidden();
   await page.getByRole("button", { name: "Save preset" }).click();
-  await page.getByRole("dialog", { name: "Save preset" }).getByRole("button", { name: "Save" }).click();
   await expect.poll(async () => (await presets(request, id)).find((p: { is_default: boolean }) => p.is_default)?.name).toBe("Up two");
 
-  // "Save preset" under a new name keeps the loaded one and adds another.
+  // Save updates the selected preset in place, with no dialog; nothing new is added.
+  await page.getByRole("button", { name: "Pitch up 0.5" }).click();
+  await expect(page.getByTestId("unsaved")).toBeVisible();
   await page.getByRole("button", { name: "Save preset" }).click();
-  const dlg = page.getByRole("dialog", { name: "Save preset" });
-  await dlg.getByLabel("Name").fill("Up two again");
-  await dlg.getByRole("button", { name: "Save" }).click();
-  await expect.poll(async () => (await presets(request, id)).map((p: { name: string }) => p.name)).toEqual([
-    "Down one",
-    "Up two",
-    "Up two again",
+  await expect(page.getByRole("dialog", { name: "Save as new preset" })).toHaveCount(0);
+  await expect.poll(async () => (await presets(request, id)).map((p: { name: string; semitones: number }) => [p.name, p.semitones])).toEqual([
+    ["Down one", -1],
+    ["Up two", 2.5],
   ]);
+  await expect(page.getByTestId("unsaved")).toBeHidden();
 
   await page.getByRole("button", { name: "Open at original" }).click();
   await expect.poll(async () => (await presets(request, id)).some((p: { is_default: boolean }) => p.is_default)).toBe(false);

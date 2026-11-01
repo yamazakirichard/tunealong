@@ -39,7 +39,7 @@ test("the song plays in the modal, and a +2 default preset renders and is used",
   await page.getByRole("button", { name: "Pitch up 1" }).click();
   await page.getByRole("button", { name: "Pitch up 1" }).click();
   await page.getByRole("button", { name: "Save as…" }).click();
-  const dlg = page.getByRole("dialog", { name: "Save preset" });
+  const dlg = page.getByRole("dialog", { name: "Save as new preset" });
   await dlg.getByLabel("Name").fill("Smoke +2");
   await dlg.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("render-badge")).toHaveText("cached", { timeout: 60_000 });

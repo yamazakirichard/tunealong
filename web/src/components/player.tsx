@@ -8,6 +8,8 @@ import {
   MdPause,
   MdPlayArrow,
   MdRepeat,
+  MdSave,
+  MdSaveAs,
   MdVolumeDown,
   MdVolumeOff,
   MdVolumeUp,
@@ -80,7 +82,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [playing, setPlaying] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [saveMode, setSaveMode] = useState<"save" | "save-as" | null>(null);
+  const [naming, setNaming] = useState(false); // the Save as… dialog is open
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Volume is this browser's, not the preset's: it depends on the speakers, not the song.
   const [volume, setVolume] = useState(() => prefs.load("volume", 1));
@@ -92,8 +94,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [length, setLength] = useState(0);
 
   // Latest values for callbacks that outlive a render (rAF loop, key handler).
-  const live = useRef({ semitones, tempo, loopA, loopB, loopOn, loaded, saveMode, confirmDelete });
-  live.current = { semitones, tempo, loopA, loopB, loopOn, loaded, saveMode, confirmDelete };
+  const live = useRef({ semitones, tempo, loopA, loopB, loopOn, loaded, naming, confirmDelete });
+  live.current = { semitones, tempo, loopA, loopB, loopOn, loaded, naming, confirmDelete };
 
   const preset = presets.find((p) => p.id === presetId) ?? null;
   const badge = loaded?.source === "render" ? "cached" : pendingFor !== null ? "rendering…" : "original";
@@ -362,11 +364,12 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
   // Saving renders pitch AND tempo with Rubber Band; until that's ready the
   // live preview (SoundTouch pitch, browser tempo) keeps playing. The most
-  // recently saved preset becomes the song's default. "Save preset" updates the
-  // loaded preset only while its name is kept; a new name is a new preset.
-  const save = async (name: string) => {
+  // recently saved preset becomes the song's default. With a name (Save as…) it's
+  // a new preset; without one (Save) it updates the selected preset in place.
+  const save = async (name?: string) => {
+    if (name === undefined && !preset) return;
     const body = {
-      name,
+      name: name ?? preset!.name,
       semitones,
       tempo,
       bake_tempo: true,
@@ -376,11 +379,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     };
     try {
       const saved =
-        saveMode === "save" && preset && preset.name === name ? await api.patchPreset(preset.id, body) : await api.createPreset(song.id, body);
+        name === undefined ? await api.patchPreset(preset!.id, body) : await api.createPreset(song.id, body);
       const detail = await api.song(song.id);
       setPresets(detail.presets ?? []);
       setPresetId(saved.id);
-      setSaveMode(null);
+      setNaming(false);
       toast({ text: `Saved "${saved.name}"${isIdentity(saved.semitones, saved.tempo, saved.bake_tempo) ? "" : " — rendering"}` });
       applyPlayback(await api.presetPlayback(saved.id), saved);
       void lib.refresh();
@@ -408,7 +411,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (live.current.saveMode || live.current.confirmDelete) return; // the dialogs handle their own keys
+      if (live.current.naming || live.current.confirmDelete) return; // the dialogs handle their own keys
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
@@ -675,11 +678,27 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
               ))}
             </select>
           </label>
-          {preset && (
-            <button type="button" className={ctl} onClick={() => setConfirmDelete(true)} aria-label="Delete preset" title={`Delete "${preset.name}"`}>
-              <MdDeleteOutline />
+          <div className="flex items-center gap-1" role="group" aria-label="Preset actions">
+            <button
+              type="button"
+              className={classNames(ctl, "relative")}
+              onClick={() => void save()}
+              disabled={!preset}
+              aria-label="Save preset"
+              title={preset ? `Save changes to "${preset.name}"${modified ? "" : " (makes it the default)"}` : "Pick a preset to save, or use Save as…"}
+            >
+              <MdSave />
+              {modified && <span data-testid="unsaved" aria-hidden className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />}
             </button>
-          )}
+            <button type="button" className={ctl} onClick={() => setNaming(true)} aria-label="Save as…" title="Save as a new preset">
+              <MdSaveAs />
+            </button>
+            {preset && (
+              <button type="button" className={classNames(ctl, "ml-2")} onClick={() => setConfirmDelete(true)} aria-label="Delete preset" title={`Delete "${preset.name}"`}>
+                <MdDeleteOutline />
+              </button>
+            )}
+          </div>
           {presets.some((p) => p.is_default) && (
             <button type="button" className={ctl} onClick={openAtOriginal} title="Stop opening this song with a preset">
               Open at original
@@ -736,21 +755,13 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
           <div className="flex items-center gap-1 ml-auto">
             <button type="button" className={ctl} onClick={resetToOriginal}>Reset to original</button>
-            <button type="button" className={ctl} onClick={() => setSaveMode("save")}>Save preset</button>
-            <button type="button" className={ctl} onClick={() => setSaveMode("save-as")}>Save as…</button>
             <button type="button" className={ctl} onClick={toggleFullscreen} aria-label="Fullscreen (F)">
               {fullscreen ? <MdFullscreenExit /> : <MdFullscreen />}
             </button>
           </div>
         </div>
 
-        {saveMode && (
-          <SaveDialog
-            initialName={saveMode === "save" && preset ? preset.name : ""}
-            onCancel={() => setSaveMode(null)}
-            onSave={save}
-          />
-        )}
+        {naming && <SaveDialog onCancel={() => setNaming(false)} onSave={save} />}
         {confirmDelete && preset && (
           <DeletePresetDialog name={preset.name} onCancel={() => setConfirmDelete(false)} onDelete={deletePreset} />
         )}
@@ -759,12 +770,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   );
 }
 
-function SaveDialog({ initialName, onCancel, onSave }: {
-  initialName: string;
-  onCancel: () => void;
-  onSave: (name: string) => void;
-}) {
-  const [name, setName] = useState(initialName);
+function SaveDialog({ onCancel, onSave }: { onCancel: () => void; onSave: (name: string) => void }) {
+  const [name, setName] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (name.trim()) onSave(name.trim());
@@ -778,10 +785,10 @@ function SaveDialog({ initialName, onCancel, onSave }: {
       <form
         onSubmit={submit}
         role="dialog"
-        aria-label="Save preset"
+        aria-label="Save as new preset"
         className="w-full max-w-sm rounded-lg bg-theme-50 dark:bg-theme-800 text-theme-800 dark:text-theme-100 p-5 flex flex-col gap-3"
       >
-        <h2 className="text-lg font-semibold">Save preset</h2>
+        <h2 className="text-lg font-semibold">Save as new preset</h2>
         <label className="text-sm flex flex-col gap-1">
           Name
           <input autoFocus name="preset-name" type="text" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
