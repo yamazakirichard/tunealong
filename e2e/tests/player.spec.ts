@@ -258,6 +258,28 @@ test("A/B loop keeps playback between the points", async ({ page }) => {
   expect(t).toBeLessThanOrEqual(s.loop_b + 0.1);
 });
 
+test("a preset's A/B don't carry over to (original), and come back with the preset", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  await page.getByTestId("player").focus();
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThan(1);
+  await page.keyboard.press("a");
+  await expect.poll(async () => (await sb(page)).currentTime).toBeGreaterThan((await sb(page)).loop_a + 1);
+  await page.keyboard.press("b");
+  const saved = await sb(page);
+  await saveAs(page, "Solo");
+
+  const preset = page.getByLabel("Preset", { exact: true });
+  await preset.selectOption({ label: "(original)" });
+  let s = await sb(page);
+  expect([s.loop_a, s.loop_b, s.loopOn]).toEqual([null, null, false]);
+  await expect(page.getByTitle("Set loop start (A)")).toHaveText("A");
+
+  await preset.selectOption({ label: "Solo (default)" });
+  s = await sb(page);
+  expect([s.loop_a, s.loop_b, s.loopOn]).toEqual([saved.loop_a, saved.loop_b, true]);
+});
+
 test("a saved A alone is the start point: the song reopens at A", async ({ page }) => {
   await page.goto("./");
   await openSong(page, A);

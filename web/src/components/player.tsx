@@ -276,9 +276,14 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     if (document.fullscreenElement) void document.exitFullscreen();
     else void modalRef.current?.requestFullscreen().catch(() => {});
   };
+  // The original has no loop points: a preset's A/B don't carry over to it.
   const resetToOriginal = () => {
     setSemitones(0);
     setTempo(1);
+    setLoopA(null);
+    setLoopB(null);
+    setLoopOn(false);
+    startAt.current = null;
     setPresetId(null);
     setPendingFor(null);
     load(ORIGINAL(song.id));
