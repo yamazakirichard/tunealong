@@ -60,6 +60,25 @@ test("setting the tempo to 0.75 sets video.playbackRate", async ({ page }) => {
   await expect.poll(async () => (await sb(page)).pitch).toBe(-1);
 });
 
+test("the tempo can be typed and nudged by 0.01", async ({ page }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  const field = page.getByLabel("Tempo value");
+  await field.fill("0.95");
+  await field.press("Enter");
+  await expect.poll(async () => (await sb(page)).playbackRate).toBe(0.95);
+  await page.getByRole("button", { name: "Tempo down 0.01" }).click();
+  await expect.poll(async () => (await sb(page)).playbackRate).toBe(0.94);
+  await expect(field).toHaveValue("0.94");
+  await field.fill("5");
+  await field.press("Enter");
+  await expect(field).toHaveValue("2.00"); // clamped
+  await field.fill("1.3");
+  await field.press("Escape"); // reverts, and the player stays open
+  await expect(field).toHaveValue("2.00");
+  await expect(page.getByTestId("player")).toBeVisible();
+});
+
 test("moving sliders then closing without saving changes nothing", async ({ page, request }) => {
   await page.goto("./");
   const id = await songId(request, A);

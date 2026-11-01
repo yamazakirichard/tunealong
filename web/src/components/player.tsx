@@ -55,6 +55,37 @@ function fromPlayback(songId: number, pb: Playback, preset: Preset | null): Load
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
+/** The tempo readout, typeable: commits on Enter or blur, Escape reverts. */
+function TempoField({ tempo, onCommit }: { tempo: number; onCommit: (t: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    const t = Number(draft);
+    if (draft !== null && draft.trim() !== "" && Number.isFinite(t)) onCommit(clampTempo(t));
+    setDraft(null);
+  };
+  return (
+    <input
+      type="number"
+      data-testid="tempo"
+      aria-label="Tempo value"
+      min={TEMPO_MIN}
+      max={TEMPO_MAX}
+      step={0.01}
+      value={draft ?? tempo.toFixed(2)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        else if (e.key === "Escape") {
+          e.stopPropagation(); // don't close the player
+          setDraft(null);
+        }
+      }}
+      className="w-16 rounded bg-white/10 px-1 py-0.5 text-center tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+    />
+  );
+}
+
 declare global {
   interface Window {
     __songbook?: Record<string, unknown>;
@@ -437,7 +468,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         return;
       }
       const t = e.target as HTMLElement;
-      if (t.matches("input[type=text], input[type=search], textarea, select") || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (t.matches("input[type=text], input[type=search], input[type=number], textarea, select") || e.ctrlKey || e.metaKey || e.altKey) return;
       if (t.matches("input[type=range]") && (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End")) return;
       const { semitones: s, tempo: tp, loopOn: on } = live.current;
       const r = shortcut({ semitones: s, tempo: tp, loopOn: on }, e.key);
@@ -726,15 +757,13 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
               min={TEMPO_MIN}
               max={TEMPO_MAX}
               step={0.01}
-              list="tempo-ticks"
               value={tempo}
               onChange={(e) => setTempo(clampTempo(Number(e.target.value)))}
-              className="w-40 accent-theme-400"
+              className="w-56 accent-theme-400"
             />
-            <datalist id="tempo-ticks">
-              <option value="1" />
-            </datalist>
-            <output data-testid="tempo" className="w-12 tabular-nums">{tempo.toFixed(2)}×</output>
+            <button type="button" className={ctl} aria-label="Tempo down 0.01" onClick={() => setTempo((t) => clampTempo(t - 0.01))}>−</button>
+            <TempoField tempo={tempo} onCommit={setTempo} />
+            <button type="button" className={ctl} aria-label="Tempo up 0.01" onClick={() => setTempo((t) => clampTempo(t + 0.01))}>+</button>
             <button type="button" className={ctl} onClick={() => setTempo(1)} disabled={tempo === 1}>1.0×</button>
           </div>
 
