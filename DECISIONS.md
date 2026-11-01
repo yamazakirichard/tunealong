@@ -214,7 +214,11 @@ Judgement calls made during implementation, newest last.
 - **Volume control** (owner's request, 2026-11-01): a mute button and slider right after Play, and M toggles mute.
   - It's a GainNode after the SoundTouch worklet. Without an AudioContext (no secure origin) it falls back to the element's own volume.
   - The slider is squared into the gain, so its middle sounds like about half volume.
-  - Volume and mute are this browser's (localStorage), not part of a preset: the right level depends on the speakers, not the song.
+  - Volume and mute are this browser's (localStorage), not part of a preset: the right level depends on the speakers, not the song. *Superseded for volume the same day, below.*
+- **Presets carry their own volume** (owner's call, 2026-11-01: one level across every song was wrong). Migration 4 adds `presets.volume` (0–1, the slider's value, NULL = none).
+  - Save and Save as… store the current slider value. Loading a preset with a volume sets the slider, and changing it marks the preset unsaved. Presets saved before this (NULL) don't override, and don't show as unsaved for a volume change.
+  - The browser's level (localStorage) is now the fallback: for (original), and for presets without a volume. Only changes made with no preset loaded update it, so a quiet preset doesn't make every other song quiet.
+  - Mute stays this browser's and is never saved: it's a momentary thing.
 - **Fine tempo control** (owner's request, 2026-11-01): the slider's `<datalist>` tick at 1.0 made Chrome snap to it, so 0.95 couldn't be reached. The tick is gone (the "1.0×" button resets instead), the slider is wider, − / + buttons step 0.01, and the readout is a number field. Typed values commit on Enter or blur and are clamped to 0.25–2.0, and Escape reverts without closing the player. Shortcuts are ignored while typing in it.
 - **The artist field suggests as you type** (owner's request, 2026-10-26). This replaces the native `<datalist>`, which some browsers barely show (Firefox, phones).
   - `SuggestInput` is used for the artist field in the Add and Edit dialogs. The best prefix match shows greyed after the cursor, and Tab or → takes it. A list shows up to 6 matches, prefix matches first and then word matches ("sabb" finds "Black Sabbath"). Pick one with ↑/↓ and Enter, or click it. Matching ignores case and accents. Free text still works.

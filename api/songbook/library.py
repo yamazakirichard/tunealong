@@ -5,7 +5,7 @@ import sqlite3
 SONG_FIELDS = ("id", "youtube_id", "artist_id", "title", "yt_title", "uploader", "sort_order",
                "status", "error", "notes", "added_at")
 PRESET_FIELDS = ("id", "song_id", "name", "semitones", "tempo", "bake_tempo", "loop_a", "loop_b",
-                 "is_default", "cache_key")
+                 "is_default", "cache_key", "volume")
 UNSORTED = "Unsorted"
 UNCATEGORISED = "Uncategorised"
 _ORDER = "sort_order IS NULL, sort_order"  # manual order first, unordered last

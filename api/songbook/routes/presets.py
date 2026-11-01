@@ -1,4 +1,4 @@
-"""Presets: named pitch/tempo/loop settings per song."""
+"""Presets: named pitch/tempo/loop/volume settings per song."""
 
 import sqlite3
 
@@ -17,7 +17,7 @@ def _write(conn: sqlite3.Connection, song_id: int, p: PresetIn, preset_id: int |
     semitones, tempo = cache.snap(p.semitones) + 0.0, cache.snap(p.tempo)
     values = {
         "name": p.name, "semitones": semitones, "tempo": tempo, "bake_tempo": int(p.bake_tempo),
-        "loop_a": p.loop_a, "loop_b": p.loop_b, "is_default": int(p.is_default),
+        "loop_a": p.loop_a, "loop_b": p.loop_b, "is_default": int(p.is_default), "volume": p.volume,
         "cache_key": cache.cache_key(semitones, tempo, p.bake_tempo),
     }
     if p.is_default:

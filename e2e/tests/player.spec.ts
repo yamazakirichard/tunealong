@@ -258,6 +258,32 @@ test("volume: the slider sets the gain, M mutes, and the level is remembered on 
   await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.25, 3);
 });
 
+test("a preset keeps its own volume; the original keeps the browser's", async ({ page, request }) => {
+  await page.goto("./");
+  await openSong(page, A);
+  const slider = page.getByRole("slider", { name: "Volume" });
+  const preset = page.getByLabel("Preset", { exact: true });
+  await page.getByRole("button", { name: "Pitch up 1" }).click();
+  await slider.fill("0.4");
+  await saveAs(page, "Quiet");
+  expect((await presets(request, await songId(request, A)))[0].volume).toBe(0.4);
+
+  await preset.selectOption({ label: "(original)" });
+  await expect(slider).toHaveValue("0.4"); // set before the preset existed, so also the browser's
+  await slider.fill("0.8");
+  await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.64, 3);
+  await preset.selectOption({ label: "Quiet (default)" });
+  await expect(slider).toHaveValue("0.4");
+  await slider.fill("0.6");
+  await expect(page.getByTestId("unsaved")).toBeVisible();
+
+  await closePlayer(page); // unsaved: the preset still has 0.4, and the browser still 0.8
+  await openSong(page, A);
+  await expect(slider).toHaveValue("0.4");
+  await preset.selectOption({ label: "(original)" });
+  await expect(slider).toHaveValue("0.8");
+});
+
 test("F toggles fullscreen on the modal, not a new tab", async ({ page, context }) => {
   await page.goto("./");
   await openSong(page, A);

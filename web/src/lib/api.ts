@@ -12,6 +12,7 @@ export interface Preset {
   loop_b: number | null;
   is_default: boolean;
   cache_key: string | null;
+  volume: number | null; // null = the browser's
 }
 
 export interface Song {

@@ -134,7 +134,7 @@ def test_second_default_preset_unsets_first(client, conn, lib):
 
 @pytest.mark.parametrize("body", [
     {"semitones": 13}, {"semitones": -12.5}, {"tempo": 3}, {"tempo": 0.1},
-    {"loop_a": 4, "loop_b": 2}, {"loop_a": 3, "loop_b": 3}, {"loop_a": -1}, {"name": ""}, {"bogus": True},
+    {"loop_a": 4, "loop_b": 2}, {"loop_a": 3, "loop_b": 3}, {"loop_a": -1}, {"volume": 1.5}, {"volume": -0.1}, {"name": ""}, {"bogus": True},
 ])
 def test_invalid_preset_is_422_and_db_unchanged(client, conn, lib, body):
     sid = lib["AAAAAAAAAAA"]
@@ -149,6 +149,15 @@ def test_patch_preset_checks_merged_loop(client, lib):
     p = preset(client, lib["AAAAAAAAAAA"], loop_a=2, loop_b=4).json()
     assert client.patch(f"/api/presets/{p['id']}", json={"loop_a": 5}).status_code == 422
     assert client.patch(f"/api/presets/{p['id']}", json={"loop_b": None}).json()["loop_b"] is None
+
+
+def test_preset_volume_is_stored_and_optional(client, lib):
+    sid = lib["AAAAAAAAAAA"]
+    assert preset(client, sid, name="plain").json()["volume"] is None
+    p = preset(client, sid, name="quiet", volume=0.4).json()
+    assert p["volume"] == 0.4
+    assert client.patch(f"/api/presets/{p['id']}", json={"semitones": 1}).json()["volume"] == 0.4
+    assert client.patch(f"/api/presets/{p['id']}", json={"volume": None}).json()["volume"] is None
 
 
 def test_duplicate_preset_name_is_409(client, lib):

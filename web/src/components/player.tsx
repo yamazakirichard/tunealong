@@ -54,6 +54,7 @@ function fromPlayback(songId: number, pb: Playback, preset: Preset | null): Load
 }
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
+const browserVolume = () => prefs.load("volume", 1);
 
 /** The tempo readout, typeable: commits on Enter or blur, Escape reverts. */
 function TempoField({ tempo, onCommit }: { tempo: number; onCommit: (t: number) => void }) {
@@ -115,8 +116,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const [controlsVisible, setControlsVisible] = useState(true);
   const [naming, setNaming] = useState(false); // the Save as… dialog is open
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Volume is this browser's, not the preset's: it depends on the speakers, not the song.
-  const [volume, setVolume] = useState(() => prefs.load("volume", 1));
+  // A preset with a volume brings it; otherwise (and for the original) it's this browser's level.
+  const [volume, setVolume] = useState(browserVolume);
   const [muted, setMuted] = useState(() => prefs.load("muted", false));
   const [graphKind, setGraphKind] = useState<"worklet" | "direct" | "none">("none");
   // Position and length on the ORIGINAL timeline (like loop points), so 1:30 is
@@ -132,7 +133,11 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const badge = loaded?.source === "render" ? "cached" : pendingFor !== null ? "rendering…" : "original";
   const modified =
     preset !== null &&
-    (preset.semitones !== semitones || preset.tempo !== tempo || preset.loop_a !== loopA || preset.loop_b !== loopB);
+    (preset.semitones !== semitones ||
+      preset.tempo !== tempo ||
+      preset.loop_a !== loopA ||
+      preset.loop_b !== loopB ||
+      (preset.volume !== null && preset.volume !== volume));
 
   // --- loading sources ------------------------------------------------------
 
@@ -190,6 +195,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         setPresetId(p?.id ?? null);
         setSemitones(pb.preset_id ? (p?.semitones ?? 0) : 0);
         setTempo(p?.tempo ?? 1);
+        setVolume(p?.volume ?? browserVolume());
         setLoopA(pb.loop_a);
         setLoopB(pb.loop_b);
         setLoopOn(pb.loop_a !== null && pb.loop_b !== null);
@@ -228,7 +234,10 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   useEffect(() => {
     graphRef.current?.setVolume(muted ? 0 : volume * volume);
   }, [volume, muted, graphKind]);
-  useEffect(() => prefs.save("volume", volume), [volume]);
+  // Only a level set without a preset becomes the browser's; a preset's stays with the preset until saved.
+  useEffect(() => {
+    if (presetId === null) prefs.save("volume", volume);
+  }, [volume, presetId]);
   useEffect(() => prefs.save("muted", muted), [muted]);
 
   // --- waiting for a render -------------------------------------------------
@@ -335,6 +344,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const resetToOriginal = () => {
     setSemitones(0);
     setTempo(1);
+    setVolume(browserVolume());
     setLoopA(null);
     setLoopB(null);
     setLoopOn(false);
@@ -350,6 +360,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     setPresetId(id);
     setSemitones(p.semitones);
     setTempo(p.tempo);
+    setVolume(p.volume ?? browserVolume());
     setLoopA(p.loop_a);
     setLoopB(p.loop_b);
     setLoopOn(p.loop_a !== null && p.loop_b !== null);
@@ -407,6 +418,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       loop_a: loopA,
       loop_b: loopB,
       is_default: true,
+      volume,
     };
     try {
       const saved =

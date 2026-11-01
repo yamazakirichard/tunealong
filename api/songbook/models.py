@@ -71,6 +71,7 @@ class PresetIn(_Strict):
     loop_a: float | None = Field(default=None, ge=0)
     loop_b: float | None = Field(default=None, ge=0)
     is_default: bool = False
+    volume: float | None = Field(default=None, ge=0, le=1)  # None = the browser's
 
     @model_validator(mode="after")
     def _loop_order(self):
@@ -87,6 +88,7 @@ class PresetPatch(_Strict):
     loop_a: float | None = None
     loop_b: float | None = None
     is_default: bool | None = None
+    volume: float | None = None
 
 
 class Reorder(_Strict):
