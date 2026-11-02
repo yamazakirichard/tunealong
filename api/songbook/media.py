@@ -16,6 +16,10 @@ _EXT = "|".join(MEDIA_EXTS)
 YT_NAME_RE = re.compile(rf"^([A-Za-z0-9_-]{{11}})\.({_EXT})$")
 LOCAL_NAME_RE = re.compile(rf"^[0-9a-f]{{16}}\.({_EXT})$")
 
+# Tab files (Guitar Pro, MusicXML) live in originals/tabs/<sha256[:16]>.<ext>.
+TAB_EXTS = ("gp", "gp3", "gp4", "gp5", "gpx", "musicxml", "xml", "mxl")
+TAB_NAME_RE = re.compile(rf"^[0-9a-f]{{16}}\.({'|'.join(TAB_EXTS)})$")
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()

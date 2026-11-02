@@ -77,3 +77,19 @@ body {
 .player-video {
   object-fit: contain;
 }
+
+/* alphaTab (tab songs): the playback cursor and the beat being played. */
+.player-tab .at-cursor-bar {
+  background: rgb(251 191 36 / 0.25); /* amber-400 */
+}
+.player-tab .at-cursor-beat {
+  background: rgb(217 119 6 / 0.85); /* amber-600 */
+  width: 3px;
+}
+.player-tab .at-selection div {
+  background: rgb(251 191 36 / 0.2);
+}
+.player-tab .at-highlight * {
+  fill: rgb(217 119 6);
+  stroke: rgb(217 119 6);
+}

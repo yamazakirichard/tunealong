@@ -59,8 +59,8 @@ def ensure_render(conn, settings, song_id: int, semitones: float, tempo: float, 
     key = cache_key(semitones, tempo, bake_tempo)
     if key is None or render_row(conn, settings, song_id, key) is not None:
         return None
-    song = conn.execute("SELECT status, original_path FROM songs WHERE id = ?", (song_id,)).fetchone()
-    if song is None or song["status"] != "ready" or not song["original_path"]:
+    song = conn.execute("SELECT status, original_path, kind FROM songs WHERE id = ?", (song_id,)).fetchone()
+    if song is None or song["status"] != "ready" or not song["original_path"] or song["kind"] == "tab":
         return None
     payload = {"song_id": song_id, "cache_key": key, "semitones": snap(semitones) + 0.0,
                "tempo": snap(tempo), "bake_tempo": bool(bake_tempo)}
@@ -83,6 +83,11 @@ def playback(conn, settings, song_id: int, preset) -> dict:
         "loop_b": preset["loop_b"] if preset else None,
         "render_error": None,
     }
+    kind = conn.execute("SELECT kind FROM songs WHERE id = ?", (song_id,)).fetchone()
+    if kind is not None and kind["kind"] == "tab":
+        # alphaTab plays the file and applies pitch, tempo and volume itself.
+        out["source"] = "tab"
+        return out
     key = cache_key(semitones, tempo, bake)
     if preset is not None and preset["cache_key"] != key:
         # ENGINE_VERSION changed since the preset was saved.

@@ -1,13 +1,17 @@
-"""Songs: add by URL, read, edit, delete, link to YouTube, categories, playback."""
+"""Songs: add by URL or tab file, read, edit, delete, link to YouTube, categories, playback."""
 
+import hashlib
+import os
 import shutil
 import sqlite3
+import tempfile
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from .. import artists, cache, config, db, jobs, library
 from ..deps import get_conn, get_settings
+from ..media import TAB_EXTS
 from ..models import LinkIn, SongAdd, SongPatch
 from ..youtube import parse_id
 
@@ -60,6 +64,63 @@ def add_song(body: SongAdd, response: Response, conn: sqlite3.Connection = Depen
     return {"song": library.song_dict(row), "duplicate": False}
 
 
+def _form_text(value: str | None, max_len: int) -> str | None:
+    value = (value or "").strip()
+    if len(value) > max_len:
+        raise HTTPException(422, f"longer than {max_len} characters")
+    return value or None
+
+
+@router.post("/songs/tab", status_code=201)
+async def add_tab(file: UploadFile = File(...), artist: str | None = Form(None), title: str | None = Form(None),
+                  conn: sqlite3.Connection = Depends(get_conn),
+                  settings: config.Settings = Depends(get_settings)):
+    """Upload a Guitar Pro / MusicXML file as a tab song. The same bytes twice is a 409."""
+    name = os.path.basename(file.filename or "")
+    stem, _, ext = name.rpartition(".")
+    ext = ext.lower()
+    if not stem or ext not in TAB_EXTS:
+        raise HTTPException(415, f"not a tab file; expected one of: {', '.join(TAB_EXTS)}")
+    artist, title = _form_text(artist, 200), _form_text(title, 500) or stem
+    limit = int(settings.tab_max_mb * 1024 * 1024)
+    settings.tabs_dir.mkdir(parents=True, exist_ok=True)
+    h, size = hashlib.sha256(), 0
+    fd, tmp_name = tempfile.mkstemp(prefix=".upload-", dir=settings.tabs_dir)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(413, f"tab file is larger than {settings.tab_max_mb:g} MB")
+                h.update(chunk)
+                out.write(chunk)
+        if size == 0:
+            raise HTTPException(422, "the file is empty")
+        sha = h.hexdigest()
+        dest = settings.tabs_dir / f"{sha[:16]}.{ext}"
+        rel = dest.relative_to(settings.root).as_posix()
+        with db.transaction(conn):
+            other = conn.execute("SELECT * FROM songs WHERE original_sha256 = ?", (sha,)).fetchone()
+            if other is not None:
+                return JSONResponse(status_code=409, content={
+                    "detail": "this file is already in the library", "song": library.song_dict(other)})
+            os.replace(tmp_name, dest)
+            tmp_name = None
+            # A file kept on disk after its song was deleted: uploading it again brings it back.
+            conn.execute("DELETE FROM ignored_paths WHERE path = ?", (rel,))
+            artist_id = artists.get_or_create(conn, artist) if artist else None
+            song_id = conn.execute(
+                "INSERT INTO songs (youtube_id, artist_id, title, original_path, original_sha256, status, kind)"
+                " VALUES (NULL, ?, ?, ?, ?, 'ready', 'tab')",
+                (artist_id, title, rel, sha),
+            ).lastrowid
+            row = conn.execute("SELECT * FROM songs WHERE id = ?", (song_id,)).fetchone()
+    finally:
+        if tmp_name:
+            os.unlink(tmp_name)
+    return {"song": library.song_dict(row), "duplicate": False}
+
+
 @router.get("/songs/{song_id}")
 def get_song(song_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
     song = library.full_song(conn, song_id)
@@ -87,6 +148,10 @@ def patch_song(song_id: int, body: SongPatch, conn: sqlite3.Connection = Depends
             sets["title"] = body.title
         if "notes" in fields:
             sets["notes"] = body.notes
+        if "tab_track" in fields:
+            if row["kind"] != "tab":
+                raise HTTPException(422, "tab_track is only for tab songs")
+            sets["tab_track"] = body.tab_track
         if sets:
             conn.execute(f"UPDATE songs SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?",
                          (*sets.values(), song_id))
@@ -119,6 +184,8 @@ def link_song(song_id: int, body: LinkIn, conn: sqlite3.Connection = Depends(get
     yid = _parse(body.url)
     with db.transaction(conn):
         row = _song_or_404(conn, song_id)
+        if row["kind"] == "tab":
+            raise HTTPException(422, "a tab song can't be linked to a YouTube video")
         if row["youtube_id"] == yid:
             return library.full_song(conn, song_id)
         other = conn.execute("SELECT * FROM songs WHERE youtube_id = ?", (yid,)).fetchone()

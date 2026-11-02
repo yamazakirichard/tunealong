@@ -153,9 +153,12 @@ class Worker:
 
     def _render(self, payload: dict) -> None:
         song_id, key = payload["song_id"], payload["cache_key"]
-        song = self.conn.execute("SELECT original_path FROM songs WHERE id = ?", (song_id,)).fetchone()
+        song = self.conn.execute("SELECT original_path, kind FROM songs WHERE id = ?", (song_id,)).fetchone()
         if song is None or not song["original_path"]:
             log.info("render %s for song %s skipped: song or original gone", key, song_id)
+            return
+        if song["kind"] == "tab":
+            log.info("render %s for song %s skipped: tab songs are played by alphaTab", key, song_id)
             return
         out_dir = self.settings.renders_dir / str(song_id)
         final = render.render(render.Job(

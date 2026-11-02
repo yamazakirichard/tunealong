@@ -27,6 +27,8 @@ export interface Song {
   error: string | null;
   notes: string | null;
   added_at: string;
+  kind: "media" | "tab"; // tab = a Guitar Pro / MusicXML file played by alphaTab
+  tab_track: number | null;
   media_url: string | null;
   categories: number[];
   default_preset: Preset | null;
@@ -66,7 +68,7 @@ export interface Category {
 
 export interface Playback {
   preset_id: number | null;
-  source: "original" | "pending" | "render";
+  source: "original" | "pending" | "render" | "tab";
   url: string;
   live_semitones: number;
   live_tempo: number;
@@ -124,9 +126,20 @@ export const api = {
   addSong: (body: { url: string; artist?: string; title?: string }) =>
     fetch("api/songs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(async (r) => ({ status: r.status, data: await r.json() })),
+  /** Upload a tab file. 201 = added, 409 = these bytes are already a song (data.song). */
+  addTab: (file: File, fields: { artist?: string; title?: string }) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (fields.artist) form.append("artist", fields.artist);
+    if (fields.title) form.append("title", fields.title);
+    return fetch("api/songs/tab", { method: "POST", body: form }).then(async (r) => ({
+      status: r.status,
+      data: await r.json().catch(() => ({})),
+    }));
+  },
   youtube: (url: string) => call<YoutubeInfo>("GET", `api/youtube?${new URLSearchParams({ url })}`),
   song: (id: number) => call<Song>("GET", `api/songs/${id}`),
-  patchSong: (id: number, body: Partial<{ artist_id: number | null; artist_name: string; title: string; notes: string | null }>) =>
+  patchSong: (id: number, body: Partial<{ artist_id: number | null; artist_name: string; title: string; notes: string | null; tab_track: number | null }>) =>
     call<Song>("PATCH", `api/songs/${id}`, body),
   deleteSong: (id: number, deleteFile: boolean) => call<void>("DELETE", `api/songs/${id}?delete_file=${deleteFile}`),
   linkSong: (id: number, url: string) => call<Song>("POST", `api/songs/${id}/link`, { url }),

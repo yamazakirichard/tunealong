@@ -3,7 +3,7 @@
 import sqlite3
 
 SONG_FIELDS = ("id", "youtube_id", "artist_id", "title", "yt_title", "uploader", "sort_order",
-               "status", "error", "notes", "added_at")
+               "status", "error", "notes", "added_at", "kind", "tab_track")
 PRESET_FIELDS = ("id", "song_id", "name", "semitones", "tempo", "bake_tempo", "loop_a", "loop_b",
                  "is_default", "cache_key", "volume")
 UNSORTED = "Unsorted"

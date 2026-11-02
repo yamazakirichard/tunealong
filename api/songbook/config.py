@@ -24,6 +24,7 @@ class Settings:
     cache_max_gb: float | None = None
     gc_interval_s: float = 3600.0
     heartbeat_path: Path | None = None  # the worker touches this; its healthcheck reads it
+    tab_max_mb: float = 10.0            # largest tab file accepted by upload
 
     @property
     def auth_enabled(self) -> bool:
@@ -40,6 +41,10 @@ class Settings:
     @property
     def local_dir(self) -> Path:
         return self.originals_dir / "local"
+
+    @property
+    def tabs_dir(self) -> Path:
+        return self.originals_dir / "tabs"
 
     @property
     def renders_dir(self) -> Path:
@@ -69,6 +74,7 @@ def load() -> Settings:
         cache_max_gb=float(os.environ["SONGBOOK_CACHE_MAX_GB"]) if os.environ.get("SONGBOOK_CACHE_MAX_GB") else None,
         gc_interval_s=float(os.environ.get("SONGBOOK_GC_INTERVAL_S", "3600")),
         heartbeat_path=Path(os.environ["SONGBOOK_HEARTBEAT"]) if os.environ.get("SONGBOOK_HEARTBEAT") else None,
+        tab_max_mb=float(os.environ.get("SONGBOOK_TAB_MAX_MB", "10")),
     )
 
 
@@ -83,6 +89,6 @@ def normalize_base_path(raw: str) -> str:
 
 
 def ensure_dirs(settings: Settings) -> None:
-    for d in (settings.root, settings.originals_dir, settings.local_dir, settings.renders_dir,
+    for d in (settings.root, settings.originals_dir, settings.local_dir, settings.tabs_dir, settings.renders_dir,
               settings.artist_images_dir):
         d.mkdir(parents=True, exist_ok=True)

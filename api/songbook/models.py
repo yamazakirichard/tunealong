@@ -22,6 +22,7 @@ class SongPatch(_Strict):
     artist_name: str | None = Field(default=None, max_length=200)
     title: str | None = Field(default=None, min_length=1, max_length=500)
     notes: str | None = None
+    tab_track: int | None = Field(default=None, ge=0, le=999)
 
     @model_validator(mode="after")
     def _one_artist_field(self):

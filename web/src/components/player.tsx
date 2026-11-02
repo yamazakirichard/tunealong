@@ -22,6 +22,7 @@ import { useLibrary } from "../lib/library";
 import { loopSeek, mapPosition } from "../lib/loop";
 import * as prefs from "../lib/prefs";
 import { clampPitch, clampTempo, shortcut, TEMPO_MAX, TEMPO_MIN } from "../lib/shortcuts";
+import { type MediaLike, TabMedia, tabErrors, tabPitch, type TabTrack } from "../lib/tabMedia";
 import { buttonClass, inputClass, plainButtonClass } from "./dialog";
 import { useToast } from "./toasts";
 
@@ -101,14 +102,35 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   const lib = useLibrary();
   const toast = useToast();
   const modalRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // The <video>, or for a tab song an alphaTab player dressed as one (lib/tabMedia.ts).
+  const isTab = song.kind === "tab";
+  const videoRef = useRef<MediaLike | null>(null);
+  const [tracks, setTracks] = useState<TabTrack[]>([]);
+  const [trackShown, setTrackShown] = useState(song.tab_track ?? 0);
+  const tabRef = useRef<TabMedia | null>(null);
+  if (isTab && !tabRef.current) {
+    tabRef.current = new TabMedia(song.tab_track, (list, shown) => {
+      setTracks(list);
+      setTrackShown(shown);
+    });
+    videoRef.current = tabRef.current;
+  }
   const graphRef = useRef<Graph | null>(null);
   // A saved A is where the song starts, B or no B: seek there once the media can take it (original timeline).
   const startAt = useRef<number | null>(null);
 
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetId, setPresetId] = useState<number | null>(null);
-  const [semitones, setSemitones] = useState(0);
+  const [semitones, setSemitonesRaw] = useState(0);
+  // alphaTab's synth transposes by whole semitones only.
+  const setSemitones = useCallback(
+    (v: number | ((s: number) => number)) =>
+      setSemitonesRaw((s) => {
+        const next = typeof v === "function" ? v(s) : v;
+        return isTab ? tabPitch(next) : next;
+      }),
+    [isTab],
+  );
   const [tempo, setTempo] = useState(1);
   const [loopA, setLoopA] = useState<number | null>(null);
   const [loopB, setLoopB] = useState<number | null>(null);
@@ -123,7 +145,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   // A preset with a volume brings it; otherwise (and for the original) it's this browser's level.
   const [volume, setVolume] = useState(browserVolume);
   const [muted, setMuted] = useState(() => prefs.load("muted", false));
-  const [graphKind, setGraphKind] = useState<"worklet" | "direct" | "none">("none");
+  const [graphKind, setGraphKind] = useState<Graph["kind"] | "none">("none");
   // Position and length on the ORIGINAL timeline (like loop points), so 1:30 is
   // the same spot in the song whichever render is playing.
   const [position, setPosition] = useState(0);
@@ -134,7 +156,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   live.current = { semitones, tempo, loopA, loopB, loopOn, loaded, naming, confirmDelete };
 
   const preset = presets.find((p) => p.id === presetId) ?? null;
-  const badge = loaded?.source === "render" ? "cached" : pendingFor !== null ? "rendering…" : "original";
+  const badge = isTab ? "tab" : loaded?.source === "render" ? "cached" : pendingFor !== null ? "rendering…" : "original";
   const modified =
     preset !== null &&
     (preset.semitones !== semitones ||
@@ -186,8 +208,19 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     document.body.style.overflow = "hidden";
     modalRef.current?.focus();
 
+    // A <video> calls these through its JSX props; the tab player sends the same events.
+    const tab = tabRef.current;
+    const onTabEvent = (e: Event) => {
+      if (e.type === "play") setPlaying(true);
+      else if (e.type === "pause" || e.type === "ended") setPlaying(false);
+      else if (e.type === "error") toast({ text: `Tab: ${tabErrors.at(-1) ?? "could not load"}`, kind: "error" });
+      else syncTimeRef.current();
+    };
+    const tabEvents = ["play", "pause", "ended", "error", "timeupdate", "loadedmetadata", "durationchange", "seeked"];
+    tabEvents.forEach((t) => tab?.addEventListener(t, onTabEvent));
+
     (async () => {
-      graphRef.current = await buildGraph(video);
+      graphRef.current = tab ? tab.graph() : await buildGraph(video as HTMLVideoElement);
       if (cancelled) return;
       setGraphKind(graphRef.current.kind);
       try {
@@ -212,6 +245,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
     return () => {
       cancelled = true;
+      tabEvents.forEach((t) => tab?.removeEventListener(t, onTabEvent));
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -295,14 +329,14 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     };
     const schedule = () => {
       // rVFC only fires while frames are presented: fall back to rAF for audio-only media.
-      if (useVfc && video.videoWidth > 0 && !video.paused) handle = video.requestVideoFrameCallback(check);
+      if (useVfc && video.videoWidth > 0 && !video.paused) handle = (video as HTMLVideoElement).requestVideoFrameCallback(check);
       else handle = requestAnimationFrame(check);
     };
     schedule();
     return () => {
       stop = true;
       cancelAnimationFrame(handle);
-      if (useVfc) video.cancelVideoFrameCallback?.(handle);
+      if (useVfc) (video as HTMLVideoElement).cancelVideoFrameCallback?.(handle);
     };
   }, []);
 
@@ -392,6 +426,17 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     setPosition(v.currentTime / scale);
     if (Number.isFinite(v.duration)) setLength(v.duration / scale);
   };
+  const syncTimeRef = useRef(syncTime);
+  syncTimeRef.current = syncTime;
+
+  const showTrack = async (index: number) => {
+    tabRef.current?.showTrack(index);
+    try {
+      await api.patchSong(song.id, { tab_track: index });
+    } catch (e) {
+      toast({ text: errorText(e), kind: "error" });
+    }
+  };
 
   /** Stop the song opening shifted: no preset is the default any more. */
   const openAtOriginal = async () => {
@@ -430,7 +475,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       setPresets(detail.presets ?? []);
       setPresetId(saved.id);
       setNaming(false);
-      toast({ text: `Saved "${saved.name}"${isIdentity(saved.semitones, saved.tempo, saved.bake_tempo) ? "" : " — rendering"}` });
+      const renders = !isTab && !isIdentity(saved.semitones, saved.tempo, saved.bake_tempo);
+      toast({ text: `Saved "${saved.name}"${renders ? " — rendering" : ""}` });
       applyPlayback(await api.presetPlayback(saved.id), saved);
       void lib.refresh();
     } catch (e) {
@@ -558,6 +604,9 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         return graphRef.current?.ctx?.state ?? "none";
       },
       graph: graphKind,
+      kind: song.kind,
+      tracks,
+      trackShown,
       source: loaded?.source ?? null,
       badge,
       presetName: preset?.name ?? null,
@@ -569,7 +618,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       loopOn,
       semitones,
       tempo,
-      errors: graphErrors,
+      errors: isTab ? tabErrors : graphErrors,
     };
   });
 
@@ -597,8 +646,22 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           fullscreen ? "w-screen h-screen" : "w-[92vw] h-[92vh]",
         )}
       >
+        {isTab ? (
+          <div
+            data-testid="player-tab"
+            className="player-tab flex-1 min-h-0 w-full overflow-auto bg-white text-black pt-10 pb-32"
+            ref={(scroller) => {
+              const host = scroller?.firstElementChild as HTMLElement | null;
+              if (scroller && host) tabRef.current?.attach(host, scroller);
+            }}
+          >
+            <div />
+          </div>
+        ) : (
         <video
-          ref={videoRef}
+          ref={(el) => {
+            videoRef.current = el;
+          }}
           className="player-video flex-1 min-h-0 w-full h-full bg-black"
           data-testid="player-video"
           playsInline
@@ -611,14 +674,20 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           onSeeked={syncTime}
           onClick={togglePlay}
         />
+        )}
 
-        <div className="absolute top-2 left-3 right-14 flex items-center gap-2 text-sm pointer-events-none">
+        <div
+          className={classNames(
+            "absolute top-0 left-0 right-12 flex items-center gap-2 px-3 py-2 text-sm pointer-events-none",
+            isTab && "bg-black/80",
+          )}
+        >
           <span className="font-semibold truncate drop-shadow">{song.title}</span>
           <span
             data-testid="render-badge"
             className={classNames(
               "rounded px-2 py-px text-xs pointer-events-auto",
-              badge === "cached" ? "bg-emerald-600" : badge === "original" ? "bg-white/20" : "bg-amber-600 animate-pulse",
+              badge === "cached" ? "bg-emerald-600" : badge === "original" || badge === "tab" ? "bg-white/20" : "bg-amber-600 animate-pulse",
             )}
           >
             {badge}
@@ -768,12 +837,12 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           <div className="flex items-center gap-1" role="group" aria-label="Pitch">
             <span>Pitch</span>
             <button type="button" className={ctl} aria-label="Pitch down 1" onClick={() => setSemitones((s) => clampPitch(s - 1))}>−1</button>
-            <button type="button" className={ctl} aria-label="Pitch down 0.5" onClick={() => setSemitones((s) => clampPitch(s - 0.5))}>−½</button>
+            {!isTab && <button type="button" className={ctl} aria-label="Pitch down 0.5" onClick={() => setSemitones((s) => clampPitch(s - 0.5))}>−½</button>}
             <output data-testid="semitones" className="w-12 text-center tabular-nums">
               {semitones > 0 ? "+" : ""}
               {semitones}
             </output>
-            <button type="button" className={ctl} aria-label="Pitch up 0.5" onClick={() => setSemitones((s) => clampPitch(s + 0.5))}>+½</button>
+            {!isTab && <button type="button" className={ctl} aria-label="Pitch up 0.5" onClick={() => setSemitones((s) => clampPitch(s + 0.5))}>+½</button>}
             <button type="button" className={ctl} aria-label="Pitch up 1" onClick={() => setSemitones((s) => clampPitch(s + 1))}>+1</button>
           </div>
 
@@ -811,6 +880,24 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
             </button>
           </div>
 
+          {tracks.length > 1 && (
+            <label className="flex items-center gap-1">
+              Track
+              <select
+                aria-label="Track"
+                className="rounded bg-white/10 text-white text-sm py-0.5 border-white/20"
+                value={trackShown}
+                onChange={(e) => void showTrack(Number(e.target.value))}
+              >
+                {tracks.map((t) => (
+                  <option key={t.index} value={t.index} className="text-black">
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <div className="flex items-center gap-1 ml-auto">
             <button type="button" className={ctl} onClick={resetToOriginal}>Reset to original</button>
             <button type="button" className={ctl} onClick={toggleFullscreen} aria-label="Fullscreen (F)">
@@ -819,7 +906,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           </div>
         </div>
 
-        {naming && <SaveDialog onCancel={() => setNaming(false)} onSave={save} />}
+        {naming && <SaveDialog isTab={isTab} onCancel={() => setNaming(false)} onSave={save} />}
         {confirmDelete && preset && (
           <DeletePresetDialog name={preset.name} onCancel={() => setConfirmDelete(false)} onDelete={deletePreset} />
         )}
@@ -828,7 +915,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
   );
 }
 
-function SaveDialog({ onCancel, onSave }: { onCancel: () => void; onSave: (name: string) => void }) {
+function SaveDialog({ isTab, onCancel, onSave }: { isTab: boolean; onCancel: () => void; onSave: (name: string) => void }) {
   const [name, setName] = useState("");
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -851,7 +938,10 @@ function SaveDialog({ onCancel, onSave }: { onCancel: () => void; onSave: (name:
           Name
           <input autoFocus name="preset-name" type="text" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <p className="text-xs text-theme-500">Pitch and tempo are rendered with Rubber Band and cached. The song opens with its most recently saved preset.</p>
+        <p className="text-xs text-theme-500">
+          {isTab ? "The tab plays at this pitch and tempo." : "Pitch and tempo are rendered with Rubber Band and cached."} The song opens with its most
+          recently saved preset.
+        </p>
         <div className="flex justify-end gap-2">
           <button type="button" className={plainButtonClass} onClick={onCancel}>Cancel</button>
           <button type="submit" className={buttonClass} disabled={!name.trim()}>Save</button>

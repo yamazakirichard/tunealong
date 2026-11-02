@@ -11,7 +11,7 @@ import processorUrl from "@soundtouchjs/audio-worklet/processor?url";
 export interface Graph {
   ctx: AudioContext | null;
   node: SoundTouchNode | null;
-  kind: "worklet" | "direct";
+  kind: "worklet" | "direct" | "tab"; // tab: alphaTab's synth (lib/tabMedia.ts)
   setPitch: (semitones: number) => void;
   pitch: () => number;
   /** Output gain, 0..2. Without a context it's the element's own volume, which stops at 1. */

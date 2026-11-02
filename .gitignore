@@ -2,6 +2,10 @@
 fixtures/originals/
 fixtures/legacy/
 
+# copied out of node_modules by the alphaTab Vite plugin on every build
+web/public/font/
+web/public/soundfont/
+
 # runtime data
 data/
 .dev-data/

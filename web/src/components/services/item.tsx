@@ -106,10 +106,16 @@ export default function Item({ song, group, index, count }: { song: Song; group:
           </button>
 
           <div className="flex flex-row items-start gap-1 z-10 service-tags pr-1 pt-1">
-            {!song.youtube_id && (
-              <span className="rounded px-1.5 text-[10px] uppercase tracking-wide bg-theme-500/30" data-testid="local-marker">
-                local
+            {song.kind === "tab" ? (
+              <span className="rounded px-1.5 text-[10px] uppercase tracking-wide bg-theme-500/30" data-testid="tab-marker">
+                tab
               </span>
+            ) : (
+              !song.youtube_id && (
+                <span className="rounded px-1.5 text-[10px] uppercase tracking-wide bg-theme-500/30" data-testid="local-marker">
+                  local
+                </span>
+              )
             )}
             {!ready && (
               <span
@@ -142,7 +148,7 @@ export default function Item({ song, group, index, count }: { song: Song; group:
                 {draggable && index < count - 1 && (
                   <MenuEntry onClick={() => lib.nudgeSong(song, group, 1)}>Move down</MenuEntry>
                 )}
-                {!song.youtube_id && <MenuEntry onClick={() => lib.linkSong(song)}>Link YouTube URL…</MenuEntry>}
+                {!song.youtube_id && song.kind !== "tab" && <MenuEntry onClick={() => lib.linkSong(song)}>Link YouTube URL…</MenuEntry>}
                 {song.status === "error" && <MenuEntry onClick={() => lib.retrySong(song)}>Retry download</MenuEntry>}
                 <MenuEntry onClick={() => lib.deleteSong(song)} danger>
                   Delete…

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import db
 from .config import Settings
-from .media import LOCAL_NAME_RE, YT_NAME_RE, sha256_file
+from .media import LOCAL_NAME_RE, TAB_NAME_RE, YT_NAME_RE, sha256_file
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,10 @@ def scan(conn: sqlite3.Connection, settings: Settings, youtube_id: str | None = 
         for path in sorted(settings.local_dir.iterdir()):
             if LOCAL_NAME_RE.match(path.name) and path.is_file() and _rel(settings, path) not in ignored:
                 _scan_local(conn, settings, path, res)
+    if youtube_id is None and settings.tabs_dir.is_dir():
+        for path in sorted(settings.tabs_dir.iterdir()):
+            if TAB_NAME_RE.match(path.name) and path.is_file() and _rel(settings, path) not in ignored:
+                _scan_local(conn, settings, path, res, kind="tab")
     return res
 
 
@@ -100,7 +104,7 @@ def _scan_youtube(conn, settings, path, yid, res: ScanResult) -> None:
         res.skipped.append(f"{rel}: {e}")
 
 
-def _scan_local(conn, settings, path, res: ScanResult) -> None:
+def _scan_local(conn, settings, path, res: ScanResult, kind: str = "media") -> None:
     rel = _rel(settings, path)
     if conn.execute("SELECT 1 FROM songs WHERE original_path = ?", (rel,)).fetchone():
         res.unchanged += 1
@@ -108,9 +112,9 @@ def _scan_local(conn, settings, path, res: ScanResult) -> None:
     try:
         with db.transaction(conn):
             conn.execute(
-                "INSERT INTO songs (youtube_id, title, original_path, original_sha256, status)"
-                " VALUES (NULL, ?, ?, ?, 'ready')",
-                (path.stem, rel, sha256_file(path)),
+                "INSERT INTO songs (youtube_id, title, original_path, original_sha256, status, kind)"
+                " VALUES (NULL, ?, ?, ?, 'ready', ?)",
+                (path.stem, rel, sha256_file(path), kind),
             )
         res.created += 1
     except sqlite3.IntegrityError as e:

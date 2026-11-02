@@ -32,5 +32,20 @@ SoundTouchJS — https://github.com/cutterbl/SoundTouchJS
   Licence: MPL-2.0 (GPL-3.0-compatible; no "Incompatible With Secondary
   Licenses" notice). Source: the repository above.
 
+alphaTab — https://github.com/CoderLine/alphaTab
+  @coderline/alphatab 1.8.4 and @coderline/alphatab-vite 1.8.4 (build
+  plugin), used unmodified as npm dependencies to draw and play tab files.
+  Copyright (C) Daniel Kuschny and Contributors
+  Licence: MPL-2.0 (GPL-3.0-compatible; no "Incompatible With Secondary
+  Licenses" notice). Source: the repository above. alphaTab bundles
+  TinySoundFont, SFZero, the Haxe standard library, SharpZipLib and NVorbis
+  (MIT) and code from libvorbis (BSD-3-Clause); see its LICENSE.header.
+  Data files it ships, copied into the built UI unmodified:
+    Bravura music font — Copyright (C) Steinberg Media Technologies GmbH,
+      SIL Open Font License 1.1, Reserved Font Name "Bravura"
+      (web/dist/font/, with Bravura-OFL.txt and Bravura-FONTLOG.txt).
+    Sonivox EAS SoundFont (sonivox.sf2/.sf3) — Copyright (C) 2004-2006 Sonic
+      Network Inc., Apache License 2.0 (web/dist/soundfont/, with LICENSE).
+
 Runtime tools (not distributed in this repository; installed in the image):
   Rubber Band Library / rubberband-cli (GPL-2.0-or-later), FFmpeg (LGPL/GPL).

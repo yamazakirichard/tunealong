@@ -16,7 +16,12 @@ from ..deps import get_conn, get_settings
 router = APIRouter(prefix="/media")
 
 _TYPES = {".webm": "video/webm", ".mp4": "video/mp4", ".mkv": "video/x-matroska",
-          ".mp3": "audio/mpeg", ".m4a": "audio/mp4"}
+          ".mp3": "audio/mpeg", ".m4a": "audio/mp4",
+          # Tab files: alphaTab reads the bytes itself, so the exact type doesn't matter much.
+          ".gp": "application/octet-stream", ".gp3": "application/octet-stream",
+          ".gp4": "application/octet-stream", ".gp5": "application/octet-stream",
+          ".gpx": "application/octet-stream", ".mxl": "application/vnd.recordare.musicxml",
+          ".musicxml": "application/vnd.recordare.musicxml+xml", ".xml": "application/xml"}
 
 
 def _file(settings: config.Settings, base: Path, rel: str | None, headers: dict | None = None) -> FileResponse:

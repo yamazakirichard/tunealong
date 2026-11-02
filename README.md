@@ -13,6 +13,10 @@ A self-hosted library for playing along to songs downloaded from YouTube.
 - Paste a YouTube URL to add a song. Artist and title are guessed from the
   video's YouTube title (`SONGBOOK_OEMBED_URL=` turns that off). The same video
   is never downloaded twice.
+- Add tab files too (Guitar Pro or MusicXML). They play in the browser with
+  [alphaTab](https://github.com/CoderLine/alphaTab): the tab scrolls with a
+  cursor, and pitch, tempo, volume, loops and presets work as for videos,
+  with no render needed.
 - Each artist's picture is shown beside their name. The worker looks every
   artist up once on [TheAudioDB](https://www.theaudiodb.com) and keeps the
   picture in `data/artist-images/` (`SONGBOOK_AUDIODB_URL=` turns that off).
@@ -78,6 +82,24 @@ docker compose run --rm -v /path/to/old/downloads:/import:ro api \
   imported. Files already in the library are skipped.
 - Supported: webm, mp4, mkv, mp3, m4a. Source files are never moved or
   deleted: they are hardlinked when on the same filesystem, otherwise copied.
+
+## Adding tab files
+
+In **Add song**, pick **Tab file** and choose a Guitar Pro (`.gp`, `.gp3`,
+`.gp4`, `.gp5`, `.gpx`) or MusicXML (`.musicxml`, `.xml`, `.mxl`) file. The
+artist and title come from the file itself, and you can change them before
+adding. The same file can't be added twice.
+
+- Tab files are stored in `data/originals/tabs/` and belong in backups like
+  the other originals. Files you copy into that folder yourself are picked up
+  by the next library scan, if they're named `<16 hex characters>.<ext>` like
+  the uploaded ones.
+- The player shows one track at a time (pick it under **Track**; the choice is
+  remembered) and plays all of them. Click a note to jump there.
+- Pitch moves in whole semitones for tabs. Tempo, volume (up to 200%), A/B
+  loops and presets work exactly as for videos. Nothing is rendered: alphaTab's
+  built-in synthesizer plays the notes live, so there's no "rendering…" wait.
+- Uploads are limited to `SONGBOOK_TAB_MAX_MB` (default 10).
 
 ## Backups
 
@@ -179,7 +201,10 @@ original plan is in [plan/songbook-PLAN.md](plan/songbook-PLAN.md).
 The visual style is forked from
 [gethomepage/homepage](https://github.com/gethomepage/homepage) v2.7.0
 (GPL-3.0). Live pitch shifting uses
-[SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (MPL-2.0). Offline
+[SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (MPL-2.0). Tab files
+are drawn and played by [alphaTab](https://github.com/CoderLine/alphaTab)
+(MPL-2.0), with the Bravura music font (SIL OFL 1.1) and the Sonivox SoundFont
+(Apache-2.0) it ships. Offline
 renders use [Rubber Band](https://breakfastquay.com/rubberband/) and
 [FFmpeg](https://ffmpeg.org/). See [NOTICE](NOTICE).
 
