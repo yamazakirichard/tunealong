@@ -1,17 +1,18 @@
-"""Songs: add by URL or tab file, read, edit, delete, link to YouTube, categories, playback."""
+"""Songs: add by URL, tab file or tab recording, read, edit, delete, link to YouTube, categories, playback."""
 
 import hashlib
 import os
 import shutil
 import sqlite3
 import tempfile
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
 
-from .. import artists, cache, config, db, jobs, library
+from .. import artists, cache, config, db, jobs, library, remux
 from ..deps import get_conn, get_settings
-from ..media import TAB_EXTS
+from ..media import TAB_EXTS, sha256_file
 from ..models import LinkIn, SongAdd, SongPatch
 from ..youtube import parse_id
 
@@ -71,6 +72,58 @@ def _form_text(value: str | None, max_len: int) -> str | None:
     return value or None
 
 
+async def _receive(file: UploadFile, dest_dir, limit_mb: float, prefix: str = ".upload-") -> tuple[str, str]:
+    """Stream an upload into a hidden temp file in dest_dir, hashing as it goes.
+
+    Returns (temp path, sha256). Raises 413 past the limit and 422 when empty;
+    the temp file is removed on any error.
+    """
+    limit = int(limit_mb * 1024 * 1024)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    h, size = hashlib.sha256(), 0
+    fd, tmp_name = tempfile.mkstemp(prefix=prefix, dir=dest_dir)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(413, f"the file is larger than {limit_mb:g} MB")
+                h.update(chunk)
+                out.write(chunk)
+        if size == 0:
+            raise HTTPException(422, "the file is empty")
+    except BaseException:
+        os.unlink(tmp_name)
+        raise
+    return tmp_name, h.hexdigest()
+
+
+def _insert_upload(conn, settings, tmp_name: str, sha: str, dest, kind: str,
+                   artist: str | None, title: str):
+    """Move a received file into place and add its song, in one transaction.
+
+    The same bytes already in the library are a 409 carrying that song.
+    """
+    rel = dest.relative_to(settings.root).as_posix()
+    with db.transaction(conn):
+        other = conn.execute("SELECT * FROM songs WHERE original_sha256 = ?", (sha,)).fetchone()
+        if other is not None:
+            os.unlink(tmp_name)
+            return JSONResponse(status_code=409, content={
+                "detail": "this file is already in the library", "song": library.song_dict(other)})
+        os.replace(tmp_name, dest)
+        # A file kept on disk after its song was deleted: uploading it again brings it back.
+        conn.execute("DELETE FROM ignored_paths WHERE path = ?", (rel,))
+        artist_id = artists.get_or_create(conn, artist) if artist else None
+        song_id = conn.execute(
+            "INSERT INTO songs (youtube_id, artist_id, title, original_path, original_sha256, status, kind)"
+            " VALUES (NULL, ?, ?, ?, ?, 'ready', ?)",
+            (artist_id, title, rel, sha, kind),
+        ).lastrowid
+        row = conn.execute("SELECT * FROM songs WHERE id = ?", (song_id,)).fetchone()
+    return {"song": library.song_dict(row), "duplicate": False}
+
+
 @router.post("/songs/tab", status_code=201)
 async def add_tab(file: UploadFile = File(...), artist: str | None = Form(None), title: str | None = Form(None),
                   conn: sqlite3.Connection = Depends(get_conn),
@@ -82,43 +135,39 @@ async def add_tab(file: UploadFile = File(...), artist: str | None = Form(None),
     if not stem or ext not in TAB_EXTS:
         raise HTTPException(415, f"not a tab file; expected one of: {', '.join(TAB_EXTS)}")
     artist, title = _form_text(artist, 200), _form_text(title, 500) or stem
-    limit = int(settings.tab_max_mb * 1024 * 1024)
-    settings.tabs_dir.mkdir(parents=True, exist_ok=True)
-    h, size = hashlib.sha256(), 0
-    fd, tmp_name = tempfile.mkstemp(prefix=".upload-", dir=settings.tabs_dir)
+    tmp_name, sha = await _receive(file, settings.tabs_dir, settings.tab_max_mb)
+    return _insert_upload(conn, settings, tmp_name, sha, settings.tabs_dir / f"{sha[:16]}.{ext}", "tab",
+                          artist, title)
+
+
+@router.post("/songs/recording", status_code=201)
+async def add_recording(file: UploadFile = File(...), artist: str | None = Form(None),
+                        title: str | None = Form(None), conn: sqlite3.Connection = Depends(get_conn),
+                        settings: config.Settings = Depends(get_settings)):
+    """Upload a browser tab recording (MediaRecorder WebM) as a local video song.
+
+    MediaRecorder writes WebM with no duration and no cues, so the browser can't
+    seek it and the length shows as unknown. It's remuxed with ffmpeg (streams
+    copied, never re-encoded) before it's stored; the stored bytes name the file.
+    """
+    name = os.path.basename(file.filename or "recording.webm")
+    if not name.lower().endswith(".webm"):
+        raise HTTPException(415, "a recording must be WebM")
+    artist = _form_text(artist, 200)
+    title = _form_text(title, 500) or "Recording"
+    raw, _ = await _receive(file, settings.local_dir, settings.recording_max_mb, prefix=".recording-")
+    fd, fixed = tempfile.mkstemp(prefix=".recording-", suffix=".webm", dir=settings.local_dir)
+    os.close(fd)
     try:
-        with os.fdopen(fd, "wb") as out:
-            while chunk := await file.read(1 << 20):
-                size += len(chunk)
-                if size > limit:
-                    raise HTTPException(413, f"tab file is larger than {settings.tab_max_mb:g} MB")
-                h.update(chunk)
-                out.write(chunk)
-        if size == 0:
-            raise HTTPException(422, "the file is empty")
-        sha = h.hexdigest()
-        dest = settings.tabs_dir / f"{sha[:16]}.{ext}"
-        rel = dest.relative_to(settings.root).as_posix()
-        with db.transaction(conn):
-            other = conn.execute("SELECT * FROM songs WHERE original_sha256 = ?", (sha,)).fetchone()
-            if other is not None:
-                return JSONResponse(status_code=409, content={
-                    "detail": "this file is already in the library", "song": library.song_dict(other)})
-            os.replace(tmp_name, dest)
-            tmp_name = None
-            # A file kept on disk after its song was deleted: uploading it again brings it back.
-            conn.execute("DELETE FROM ignored_paths WHERE path = ?", (rel,))
-            artist_id = artists.get_or_create(conn, artist) if artist else None
-            song_id = conn.execute(
-                "INSERT INTO songs (youtube_id, artist_id, title, original_path, original_sha256, status, kind)"
-                " VALUES (NULL, ?, ?, ?, ?, 'ready', 'tab')",
-                (artist_id, title, rel, sha),
-            ).lastrowid
-            row = conn.execute("SELECT * FROM songs WHERE id = ?", (song_id,)).fetchone()
+        remux.remux_webm(raw, fixed)
+    except remux.RemuxFailed as e:
+        os.unlink(fixed)
+        raise HTTPException(422, f"not a playable recording: {e}")
     finally:
-        if tmp_name:
-            os.unlink(tmp_name)
-    return {"song": library.song_dict(row), "duplicate": False}
+        os.unlink(raw)
+    sha = sha256_file(Path(fixed))
+    return _insert_upload(conn, settings, fixed, sha, settings.local_dir / f"{sha[:16]}.webm", "media",
+                          artist, title)
 
 
 @router.get("/songs/{song_id}")

@@ -17,6 +17,8 @@ A self-hosted library for playing along to songs downloaded from YouTube.
   [alphaTab](https://github.com/CoderLine/alphaTab): the tab scrolls with a
   cursor, and pitch, tempo, volume, loops and presets work as for videos,
   with no render needed.
+- Or record another browser tab (picture and sound) straight into the library:
+  you start playback there yourself, then press Stop.
 - Each artist's picture is shown beside their name. The worker looks every
   artist up once on [TheAudioDB](https://www.theaudiodb.com) and keeps the
   picture in `data/artist-images/` (`SONGBOOK_AUDIODB_URL=` turns that off).
@@ -100,6 +102,24 @@ adding. The same file can't be added twice.
   loops and presets work exactly as for videos. Nothing is rendered: alphaTab's
   built-in synthesizer plays the notes live, so there's no "rendering…" wait.
 - Uploads are limited to `SONGBOOK_TAB_MAX_MB` (default 10).
+
+## Recording a browser tab
+
+In **Add song**, pick **Record a tab** (Chrome or Edge, over HTTPS):
+
+1. Press **Record**. In the browser's share dialog, pick the tab to record and
+   tick **Also share tab audio**.
+2. Go to that tab and start playback there yourself.
+3. Come back and press **Stop** (or use **Stop sharing** in the browser's bar).
+   Check the preview, set artist and title, and press **Add**.
+
+The recording becomes a local video song. The server remuxes it with ffmpeg
+(streams copied, not re-encoded) so it can be seeked, and from then on it
+works like any other song: Rubber Band presets, loops, volume. Recordings go to
+`data/originals/local/`, up to `SONGBOOK_RECORDING_MAX_MB` (default 1024).
+Songbook only receives what the browser's screen sharing gives it. It never
+opens, controls or reads the other tab. What you record is up to you, and so
+is following that site's terms.
 
 ## Backups
 

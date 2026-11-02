@@ -137,6 +137,17 @@ export const api = {
       data: await r.json().catch(() => ({})),
     }));
   },
+  /** Upload a tab recording (WebM). 201 = added, 409 = already a song, 422 = unplayable or silent. */
+  addRecording: (blob: Blob, fields: { artist?: string; title?: string }) => {
+    const form = new FormData();
+    form.append("file", blob, "recording.webm");
+    if (fields.artist) form.append("artist", fields.artist);
+    if (fields.title) form.append("title", fields.title);
+    return fetch("api/songs/recording", { method: "POST", body: form }).then(async (r) => ({
+      status: r.status,
+      data: await r.json().catch(() => ({})),
+    }));
+  },
   youtube: (url: string) => call<YoutubeInfo>("GET", `api/youtube?${new URLSearchParams({ url })}`),
   song: (id: number) => call<Song>("GET", `api/songs/${id}`),
   patchSong: (id: number, body: Partial<{ artist_id: number | null; artist_name: string; title: string; notes: string | null; tab_track: number | null }>) =>

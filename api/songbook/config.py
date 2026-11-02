@@ -25,6 +25,7 @@ class Settings:
     gc_interval_s: float = 3600.0
     heartbeat_path: Path | None = None  # the worker touches this; its healthcheck reads it
     tab_max_mb: float = 10.0            # largest tab file accepted by upload
+    recording_max_mb: float = 1024.0    # largest tab recording accepted by upload
 
     @property
     def auth_enabled(self) -> bool:
@@ -75,6 +76,7 @@ def load() -> Settings:
         gc_interval_s=float(os.environ.get("SONGBOOK_GC_INTERVAL_S", "3600")),
         heartbeat_path=Path(os.environ["SONGBOOK_HEARTBEAT"]) if os.environ.get("SONGBOOK_HEARTBEAT") else None,
         tab_max_mb=float(os.environ.get("SONGBOOK_TAB_MAX_MB", "10")),
+        recording_max_mb=float(os.environ.get("SONGBOOK_RECORDING_MAX_MB", "1024")),
     )
 
 

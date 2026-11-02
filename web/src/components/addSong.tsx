@@ -3,19 +3,32 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, errorText, type Song, type YoutubeInfo } from "../lib/api";
 import { useLibrary } from "../lib/library";
 import { tabMetadata } from "../lib/tabMedia";
+import { canRecord, type Recording } from "../lib/tabRecorder";
 import CategoryPicker from "./categoryPicker";
+import RecordPanel from "./recordPanel";
 import SmallDialog, { buttonClass, inputClass, plainButtonClass } from "./dialog";
 import SuggestInput from "./suggestInput";
 import { useToast } from "./toasts";
 
-export default function AddSong({ open, onClose, onCategoryCreated }: {
+type Mode = "youtube" | "tab" | "record";
+const MODES: [Mode, string][] = [["youtube", "YouTube URL"], ["tab", "Tab file"], ["record", "Record a tab"]];
+
+export default function AddSong({ open, onClose: close, onCategoryCreated }: {
   open: boolean;
   onClose: () => void;
   onCategoryCreated: () => void;
 }) {
   const lib = useLibrary();
   const toast = useToast();
-  const [mode, setMode] = useState<"youtube" | "tab">("youtube");
+  const [mode, setMode] = useState<Mode>("youtube");
+  const [recording, setRecording] = useState<Recording | null>(null);
+  const [recordingNow, setRecordingNow] = useState(false);
+  // Closing mid-recording would lose it without a word: ask first.
+  const onClose = () => {
+    if (recordingNow && !window.confirm("Stop and discard the recording in progress?")) return;
+    setRecordingNow(false);
+    close();
+  };
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [artist, setArtist] = useState("");
@@ -76,6 +89,7 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
   const reset = () => {
     setUrl("");
     setFile(null);
+    setRecording(null);
     setArtist("");
     setTitle("");
     setCats([]);
@@ -83,8 +97,10 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
     guessed.current = { artist: "", title: "" };
   };
 
-  const submitTab = async () => {
-    const { status, data } = await api.addTab(file!, { artist: artist.trim(), title: title.trim() });
+  const submitUpload = async () => {
+    const fields = { artist: artist.trim(), title: title.trim() };
+    const { status, data } =
+      mode === "tab" ? await api.addTab(file!, fields) : await api.addRecording(recording!.blob, fields);
     if (status === 409 && data.song) {
       toast({ text: "Already in library", action: { label: "Open", run: () => lib.openSong(data.song) } });
     } else if (status >= 400) {
@@ -103,7 +119,7 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "tab") return await submitTab();
+      if (mode !== "youtube") return await submitUpload();
       const { status, data } = await api.addSong({
         url: url.trim(),
         artist: artist.trim() || undefined,
@@ -134,18 +150,23 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
     <SmallDialog title="Add song" open={open} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div role="radiogroup" aria-label="Source" className="flex gap-1 text-sm">
-          {(["youtube", "tab"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              onClick={() => setMode(m)}
-              className={mode === m ? buttonClass : plainButtonClass}
-            >
-              {m === "youtube" ? "YouTube URL" : "Tab file"}
-            </button>
-          ))}
+          {MODES.map(([m, label]) => {
+            const unavailable = m === "record" && !canRecord();
+            return (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                disabled={unavailable || recordingNow}
+                title={unavailable ? "Recording a tab needs Chrome or Edge, over HTTPS" : undefined}
+                className={mode === m ? buttonClass : plainButtonClass}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
         {mode === "youtube" ? (
           <label className="text-sm flex flex-col gap-1">
@@ -160,6 +181,8 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
               placeholder="https://www.youtube.com/watch?v=…"
             />
           </label>
+        ) : mode === "record" ? (
+          <RecordPanel recording={recording} onRecording={setRecording} onRecordingNow={setRecordingNow} />
         ) : (
           <label className="text-sm flex flex-col gap-1">
             Tab file <span className="text-xs text-theme-500">Guitar Pro (.gp, .gp3–.gp5, .gpx) or MusicXML (.musicxml, .xml, .mxl)</span>
@@ -187,7 +210,11 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
         <label className="text-sm flex flex-col gap-1">
           Title{" "}
           <span className="text-xs text-theme-500">
-            {mode === "youtube" ? "guessed from the YouTube title; blank uses it as is" : "from the file; blank uses the file name"}
+            {mode === "youtube"
+              ? "guessed from the YouTube title; blank uses it as is"
+              : mode === "tab"
+                ? "from the file; blank uses the file name"
+                : "blank uses \"Recording\""}
           </span>
           <input name="title" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
@@ -196,8 +223,8 @@ export default function AddSong({ open, onClose, onCategoryCreated }: {
           <button type="button" className={plainButtonClass} onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className={buttonClass} disabled={busy || (mode === "youtube" ? !url.trim() : !file)}>
-            Add
+          <button type="submit" className={buttonClass} disabled={busy || recordingNow || (mode === "youtube" ? !url.trim() : mode === "tab" ? !file : !recording)}>
+            {busy && mode === "record" ? "Uploading…" : "Add"}
           </button>
         </div>
       </form>
