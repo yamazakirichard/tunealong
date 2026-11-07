@@ -42,6 +42,7 @@ it):
 data/
 ├── songbook.sqlite        the library: songs, artists, categories, presets
 ├── originals/             downloaded and imported media (MeTube writes here)
+├── playback/              H.264 copies of originals in other codecs: rebuildable
 ├── renders/               pitch/tempo renders: a disposable cache
 ├── artist-images/         artist pictures from TheAudioDB
 └── metube-state/          MeTube's queue
@@ -121,11 +122,27 @@ Songbook only receives what the browser's screen sharing gives it. It never
 opens, controls or reads the other tab. What you record is up to you, and so
 is following that site's terms.
 
+## Video formats
+
+Downloads keep the best quality the source offers, and `originals/` is never
+changed. That is often AV1 or VP9, and Safari only plays AV1 on Macs with a
+hardware decoder, so the worker also makes an H.264 copy at the same resolution
+of anything else that arrives (`playback/<song id>.mp4`). The player and new
+renders use that copy once it's ready; until then the song plays only where the
+browser can decode the original. Songs already in the library when this arrived
+are left as they are. To convert them, run this in the worker container:
+
+```
+python -m songbook.playback queue <song id>   # or: queue all
+```
+
 ## Backups
 
 Back up `data/originals/`, `data/songbook.sqlite` and `data/artist-images/`
 (small; the database records which artists already have one). **Leave out
-`data/renders/`**: it's a cache that rebuilds itself as songs are played.
+`data/renders/`**: it's a cache that rebuilds itself as songs are played. You
+can also leave out `data/playback/`: `python -m songbook.playback queue all`
+remakes it from the originals.
 For a consistent copy of the database while the app is running, use
 `sqlite3 data/songbook.sqlite ".backup songbook-backup.sqlite"`.
 

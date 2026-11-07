@@ -672,6 +672,13 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           onLoadedMetadata={syncTime}
           onDurationChange={syncTime}
           onSeeked={syncTime}
+          onError={(e) => {
+            const code = e.currentTarget.error?.code;
+            // A new or just-added song may still be waiting for its H.264 copy.
+            if (code === 3 || code === 4) {
+              toast({ text: "Can't play this video: the browser may not support its format, or the connection dropped. Try again shortly.", kind: "error" });
+            }
+          }}
           onClick={togglePlay}
         />
         )}

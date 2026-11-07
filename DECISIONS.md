@@ -265,3 +265,16 @@ Judgement calls made during implementation, newest last.
   - The streaming, size-cap and dedup code is shared with the tab upload (`_receive` and `_insert_upload` in `routes/songs.py`). The cap is `SONGBOOK_RECORDING_MAX_MB`, default 1024 (4 Mbit/s video is about 30 MB a minute).
   - The source switch locks while recording, and closing the dialog asks before discarding a recording in progress. "Record a tab" is disabled where it can't work: no secure context, no `getDisplayMedia`, or no WebM recording (Safari).
   - Tests: `api/tests/test_recording.py` uses ffmpeg-generated piped WebM (no duration, like MediaRecorder's), and `e2e/tests/record.spec.ts` replaces `getDisplayMedia` with a canvas plus oscillator stream, since headless Chromium has no share dialog.
+
+## H.264 playback copies
+
+- **The problem.** A Tout Le Monde (AV1) never played in Safari on a Mac from the library, while H.264 songs did. The logs showed Safari reading the file's header and stopping, with every request answered 206. YouTube often serves AV1 and `format: any` keeps it, and renders stream-copy the video, so they were AV1 as well.
+- **The owner's rule: H.264 for playback, and always store the highest quality.** So nothing is asked of YouTube differently (forcing H.264 there can cap the resolution at 1080p). The original stays as downloaded and an H.264 copy is added beside it in `playback/<song_id>.mp4`.
+- **Encode:** libx264, CRF 18, preset medium, same resolution (rounded down to even), every frame at its own time, a keyframe every 2 s for seeks and A/B loops, AAC 256k, `+faststart`. Copies are several times larger than AV1: the first render converted this way went from 107 MB to 378 MB.
+- **`/media/originals/<id>` serves the copy when there is one**, so the player and API URLs don't change, and falls back to the original if the file is gone.
+- **Renders take video from the copy and audio from the original**, so a pitch or tempo render doesn't lose audio quality twice. Their output is then always mp4/AAC, even from a webm original. A render for a song still pending makes the copy first. Making a copy drops that song's old renders, which re-render on demand.
+- **Not a job kind.** The worker makes copies when its queue is idle, in the same way as artist pictures, so a new song, scanned file, recording or import is covered with one query, and downloads and renders go first. `songs.playback_state` remembers the result. A failed encode stays `error` until queued again, and the song keeps playing from its original.
+- **Songs already in the library are `skip`** (migration 7): the owner asked for this on future downloads. `python -m songbook.playback queue <id>|all` converts older ones.
+- **`playback/` is not under `renders/`**, because cache GC evicts unreferenced files there first, and these would then be rebuilt from scratch at a high CPU cost.
+- **The player now says so when a video can't be decoded** (`MediaError` code 3 or 4). It used to fail silently, which is what made this look like a network problem.
+

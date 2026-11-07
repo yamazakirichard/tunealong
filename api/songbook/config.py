@@ -17,6 +17,7 @@ class Settings:
     scan_interval_s: float = 300.0
     worker_idle_s: float = 1.0
     render_timeout_s: float = 3600.0
+    playback_timeout_s: float = 14400.0  # an H.264 copy of a long 4K video is slow
     web_dir: Path | None = None
     base_path: str = ""                 # "" or "/songbook" (no trailing slash)
     auth_user: str | None = None
@@ -52,6 +53,10 @@ class Settings:
         return self.root / "renders"
 
     @property
+    def playback_dir(self) -> Path:
+        return self.root / "playback"
+
+    @property
     def artist_images_dir(self) -> Path:
         return self.root / "artist-images"
 
@@ -68,6 +73,7 @@ def load() -> Settings:
         scan_interval_s=float(os.environ.get("SONGBOOK_SCAN_INTERVAL_S", "300")),
         worker_idle_s=float(os.environ.get("SONGBOOK_WORKER_IDLE_S", "1")),
         render_timeout_s=float(os.environ.get("SONGBOOK_RENDER_TIMEOUT_S", "3600")),
+        playback_timeout_s=float(os.environ.get("SONGBOOK_PLAYBACK_TIMEOUT_S", "14400")),
         web_dir=Path(os.environ["SONGBOOK_WEB_DIR"]) if os.environ.get("SONGBOOK_WEB_DIR") else None,
         base_path=normalize_base_path(os.environ.get("SONGBOOK_BASE_PATH", "")),
         auth_user=os.environ.get("SONGBOOK_AUTH_USER") or None,
@@ -92,5 +98,5 @@ def normalize_base_path(raw: str) -> str:
 
 def ensure_dirs(settings: Settings) -> None:
     for d in (settings.root, settings.originals_dir, settings.local_dir, settings.tabs_dir, settings.renders_dir,
-              settings.artist_images_dir):
+              settings.playback_dir, settings.artist_images_dir):
         d.mkdir(parents=True, exist_ok=True)

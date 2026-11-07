@@ -11,6 +11,7 @@ from songbook.worker import Worker
 def renders(monkeypatch):
     """Stub renderer: records each call and writes a small file."""
     calls = []
+    monkeypatch.setattr(render, "video_codec", lambda path: "h264")  # no copy to make (test_playback.py covers that)
 
     def fake(job, timeout=None):
         calls.append(job)

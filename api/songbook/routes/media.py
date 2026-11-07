@@ -46,7 +46,10 @@ def _id(raw: str) -> int:
 @router.get("/originals/{song_id}")
 def original(song_id: str, conn: sqlite3.Connection = Depends(get_conn),
              settings: config.Settings = Depends(get_settings)) -> FileResponse:
-    row = conn.execute("SELECT original_path FROM songs WHERE id = ?", (_id(song_id),)).fetchone()
+    row = conn.execute("SELECT original_path, playback_path FROM songs WHERE id = ?", (_id(song_id),)).fetchone()
+    # The song's H.264 copy if it has one: the original may be a codec this browser can't play.
+    if row and row[1] and (settings.root / row[1]).is_file():
+        return _file(settings, settings.playback_dir, row[1])
     return _file(settings, settings.originals_dir, row and row[0])
 
 

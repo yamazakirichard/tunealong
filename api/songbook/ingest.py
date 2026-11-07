@@ -92,7 +92,8 @@ def _scan_youtube(conn, settings, path, yid, res: ScanResult) -> None:
             if row["status"] != "ready" or row["original_path"] != rel:
                 conn.execute(
                     "UPDATE songs SET original_path = ?, original_sha256 = ?,"
-                    " status = 'ready', error = NULL WHERE id = ?",
+                    " status = 'ready', error = NULL, playback_path = NULL, playback_state = 'pending'"
+                    " WHERE id = ?",
                     (rel, sha256_file(path), row["id"]),
                 )
                 res.updated += 1

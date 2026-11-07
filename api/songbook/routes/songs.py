@@ -223,6 +223,7 @@ def delete_song(song_id: int, delete_file: bool = False, conn: sqlite3.Connectio
             # Keep the file, but stop the next scan from re-adding it.
             conn.execute("INSERT OR IGNORE INTO ignored_paths (path) VALUES (?)", (row["original_path"],))
     shutil.rmtree(settings.renders_dir / str(song_id), ignore_errors=True)
+    (settings.playback_dir / f"{song_id}.mp4").unlink(missing_ok=True)
     if original and delete_file:
         original.unlink(missing_ok=True)
     return Response(status_code=204)

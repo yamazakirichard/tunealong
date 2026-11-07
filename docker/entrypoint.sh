@@ -9,8 +9,8 @@ PGID="${PGID:-1000}"
 ROOT="${SONGBOOK_ROOT:-/data}"
 
 if [ "$(id -u)" = "0" ]; then
-    mkdir -p "$ROOT/originals/local" "$ROOT/renders"
-    chown "$PUID:$PGID" "$ROOT" "$ROOT/originals" "$ROOT/originals/local" "$ROOT/renders"
+    mkdir -p "$ROOT/originals/local" "$ROOT/renders" "$ROOT/playback"
+    chown "$PUID:$PGID" "$ROOT" "$ROOT/originals" "$ROOT/originals/local" "$ROOT/renders" "$ROOT/playback"
     for f in "$ROOT"/songbook.sqlite "$ROOT"/songbook.sqlite-wal "$ROOT"/songbook.sqlite-shm; do
         [ -e "$f" ] && chown "$PUID:$PGID" "$f"
     done

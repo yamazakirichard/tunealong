@@ -10,7 +10,7 @@ import sqlite3
 import threading
 import time
 
-from . import artist_images, cache, config, db, ingest, jobs, render
+from . import artist_images, cache, config, db, ingest, jobs, playback, render
 from .media import YT_NAME_RE
 from .metube import MetubeClient
 
@@ -86,7 +86,7 @@ class Worker:
                 self.enqueue_scan()
             if now >= self._next_gc:
                 self.maybe_gc()
-            if not self.run_once() and not self.maybe_artist_image():
+            if not self.run_once() and not self.maybe_playback() and not self.maybe_artist_image():
                 time.sleep(self.settings.worker_idle_s)
 
     def _beat_forever(self) -> None:
@@ -114,6 +114,14 @@ class Worker:
             return
         if removed:
             log.info("cache gc removed %d file(s)", len(removed))
+
+    def maybe_playback(self) -> bool:
+        """Make one song's H.264 copy when the queue is idle. True if a song was handled."""
+        try:
+            return playback.run_next(self.conn, self.settings)
+        except Exception:
+            log.exception("playback copy failed")
+            return False
 
     def maybe_artist_image(self) -> bool:
         """Look up one artist's picture when the queue is idle. True if it did.
@@ -160,10 +168,15 @@ class Worker:
         if song["kind"] == "tab":
             log.info("render %s for song %s skipped: tab songs are played by alphaTab", key, song_id)
             return
+        # A render copies its video stream, so the song's H.264 copy has to exist first.
+        playback.ensure(self.conn, self.settings, song_id)
+        copy = self.conn.execute("SELECT playback_path FROM songs WHERE id = ?", (song_id,)).fetchone()
+        video = self.settings.root / copy["playback_path"] if copy and copy["playback_path"] else None
         out_dir = self.settings.renders_dir / str(song_id)
         final = render.render(render.Job(
             original=self.settings.root / song["original_path"], out_dir=out_dir, key=key,
             semitones=payload["semitones"], tempo=payload["tempo"], bake_tempo=payload["bake_tempo"],
+            video=video if video and video.is_file() else None,
         ), timeout=self.settings.render_timeout_s)
         rel = final.relative_to(self.settings.root).as_posix()
         try:

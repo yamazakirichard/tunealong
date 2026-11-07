@@ -43,6 +43,7 @@ class Job:
     semitones: float
     tempo: float
     bake_tempo: bool
+    video: Path | None = None  # absolute: take the video from here (the H.264 playback copy), audio from original
 
 
 def run(cmd: list[str], timeout: float | None = None) -> None:
@@ -56,26 +57,32 @@ def run(cmd: list[str], timeout: float | None = None) -> None:
         raise RenderError(f"{Path(cmd[0]).name} exited {p.returncode}: " + " | ".join(tail))
 
 
-def has_video(path: Path) -> bool:
-    """A real video stream, not an mp3's embedded cover art."""
+def video_codec(path: Path) -> str | None:
+    """The codec of the real video stream, not an mp3's embedded cover art. None if there isn't one."""
     p = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=index:stream_disposition=attached_pic",
+        ["ffprobe", "-v", "error", "-select_streams", "v",
+         "-show_entries", "stream=codec_name:stream_disposition=attached_pic",
          "-of", "json", str(path)], capture_output=True, check=True)
     streams = json.loads(p.stdout or b"{}").get("streams", [])
-    return any(not s.get("disposition", {}).get("attached_pic") for s in streams)
+    return next((s.get("codec_name") for s in streams if not s.get("disposition", {}).get("attached_pic")), None)
+
+
+def has_video(path: Path) -> bool:
+    return video_codec(path) is not None
 
 
 def output_name(job: Job) -> str:
-    ext = job.original.suffix[1:].lower()
+    ext = (job.video or job.original).suffix[1:].lower()
     return f"{job.key}.{FORMATS[ext][0]}"
 
 
 def render(job: Job, timeout: float | None = None) -> Path:
     """Render and return the final absolute path."""
     src = job.original.resolve()
-    ext = src.suffix[1:].lower()
+    video_src = job.video.resolve() if job.video else src
+    ext = video_src.suffix[1:].lower()
     if ext not in FORMATS:
-        raise RenderError(f"can't render {src.suffix} files")
+        raise RenderError(f"can't render {video_src.suffix} files")
     out_ext, muxer, audio_args = FORMATS[ext]
     job.out_dir.mkdir(parents=True, exist_ok=True)
     final = job.out_dir / f"{job.key}.{out_ext}"
@@ -95,8 +102,8 @@ def render(job: Job, timeout: float | None = None) -> Path:
             rb += ["-T", f"{job.tempo:g}"]
         run(rb + [str(wav), str(shifted)], timeout)
 
-        video = has_video(src)
-        cmd = ff + ["-i", str(src), "-i", str(shifted)]
+        video = has_video(video_src)
+        cmd = ff + ["-i", str(video_src), "-i", str(shifted)]
         if video:
             cmd += ["-map", "0:v:0"]
         cmd += ["-map", "1:a:0"]
