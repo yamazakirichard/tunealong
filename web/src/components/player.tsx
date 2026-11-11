@@ -8,6 +8,7 @@ import {
   MdPause,
   MdPlayArrow,
   MdRepeat,
+  MdReplay,
   MdSave,
   MdSaveAs,
   MdVolumeDown,
@@ -372,6 +373,16 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       void graphRef.current?.ctx?.resume();
       void v.play().catch(() => {});
     } else v.pause();
+  };
+  /** Start over: from A while the loop is on, else from the top. Plays either way. */
+  const rewind = () => {
+    const v = videoRef.current;
+    const { loopA: a, loopOn: on, loaded: l } = live.current;
+    if (!v || !l) return;
+    startAt.current = null;
+    seekTo(on && a !== null ? a : 0);
+    void graphRef.current?.ctx?.resume();
+    if (v.paused) void v.play().catch(() => {});
   };
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -763,6 +774,15 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           <button type="button" className={ctl} onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <MdPause /> : <MdPlayArrow />}
           </button>
+          <button
+            type="button"
+            className={ctl}
+            onClick={rewind}
+            aria-label={loopOn && loopA !== null ? "Rewind to A" : "Rewind to start"}
+            title={loopOn && loopA !== null ? "Play from A" : "Play from the start"}
+          >
+            <MdReplay />
+          </button>
 
           <div className="flex items-center gap-1" role="group" aria-label="Volume">
             <button type="button" className={ctl} onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute (M)" : "Mute (M)"}>
@@ -906,7 +926,6 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
           )}
 
           <div className="flex items-center gap-1 ml-auto">
-            <button type="button" className={ctl} onClick={resetToOriginal}>Reset to original</button>
             <button type="button" className={ctl} onClick={toggleFullscreen} aria-label="Fullscreen (F)">
               {fullscreen ? <MdFullscreenExit /> : <MdFullscreen />}
             </button>
