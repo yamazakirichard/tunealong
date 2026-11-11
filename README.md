@@ -230,8 +230,10 @@ Needs Python 3.12, ffmpeg (with libvpx-vp9, libopus, libx264), Node 22 and
 Docker. rubberband-cli is only needed outside Docker. No test touches the
 network: downloads go to a fake MeTube.
 
-Design decisions are recorded in [DECISIONS.md](DECISIONS.md), and the
-original plan is in [plan/songbook-PLAN.md](plan/songbook-PLAN.md).
+How the components fit together is described in
+[ARCHITECTURE.md](ARCHITECTURE.md). Design decisions are recorded in
+[DECISIONS.md](DECISIONS.md), and the original plan is in
+[plan/songbook-PLAN.md](plan/songbook-PLAN.md).
 
 ## Credits
 

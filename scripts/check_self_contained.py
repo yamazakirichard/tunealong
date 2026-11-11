@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCS = {"README.md", "NOTICE", "DECISIONS.md", "LICENSE", ".env.example"}
+DOCS = {"README.md", "NOTICE", "DECISIONS.md", "ARCHITECTURE.md", "LICENSE", ".env.example"}
 SKIP_SUFFIX = {".png", ".jpg", ".webm", ".mp4", ".mkv", ".mp3", ".m4a", ".sqlite"}
 SKIP_NAMES = {"package-lock.json"}
 ALLOWED_DOMAINS = {
