@@ -17,7 +17,13 @@ import { songToSynth, synthToSong } from "./tabTime";
 export interface TabTrack {
   index: number;
   name: string;
+  /** Has standard notation and tablature both, so the view can show either alone. */
+  switchable: boolean;
 }
+
+/** Which staves a switchable track shows. Other tracks always show what their file says. */
+export type TabView = "both" | "tab" | "score";
+export const TAB_VIEWS: readonly TabView[] = ["both", "tab", "score"];
 
 /** What the player needs from its media: an HTMLVideoElement satisfies it too. */
 export interface MediaLike extends EventTarget {
@@ -58,6 +64,8 @@ export class TabMedia extends EventTarget implements MediaLike {
   private semitones = 0;
   private gain = 1;
   private scale = 1;
+  private view: TabView = "both";
+  private at: typeof import("@coderline/alphatab") | null = null;
   private url = "";
   private track: number;
   private destroyed = false;
@@ -148,11 +156,19 @@ export class TabMedia extends EventTarget implements MediaLike {
     if (this.ready.score) this.api.render();
   }
 
+  /** Score and tab, tab only, or score only, for a track that has both. */
+  setView(view: TabView) {
+    if (view === this.view) return;
+    this.view = view;
+    if (this.ready.score && this.applyView()) this.api!.render();
+  }
+
   /** Show a different track. Playback still plays every track. */
   showTrack(index: number) {
     const tracks = this.api?.score?.tracks;
     if (!tracks?.[index]) return;
     this.track = index;
+    this.applyView();
     this.api!.renderTracks([tracks[index]]);
     this.onTracks(trackList(tracks), index);
   }
@@ -201,12 +217,31 @@ export class TabMedia extends EventTarget implements MediaLike {
     if (tracks?.length) this.api!.changeTrackTranspositionPitch(tracks, this.semitones);
   }
 
+  /** Point alphaTab's stave profile at the view, for the shown track. True if it changed (caller renders). */
+  private applyView(): boolean {
+    const api = this.api;
+    const track = api?.score?.tracks[this.track];
+    if (!api || !track || !this.at) return false;
+    const { StaveProfile } = this.at;
+    const profile =
+      !isSwitchable(track) || this.view === "both"
+        ? StaveProfile.Default
+        : this.view === "tab"
+          ? StaveProfile.Tab
+          : StaveProfile.Score;
+    if (api.settings.display.staveProfile === profile) return false;
+    api.settings.display.staveProfile = profile;
+    api.updateSettings();
+    return true;
+  }
+
   private async open(url: string) {
     if (!this.container || !this.scroller) throw new Error("TabMedia: attach() was not called");
     const [at, res] = await Promise.all([import("@coderline/alphatab"), fetch(url)]);
     if (!res.ok) throw new Error(`could not fetch the tab file (${res.status})`);
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (this.destroyed) return;
+    this.at = at;
     this.api?.destroy();
     this.ready = { score: false, player: false, midi: false };
     // Fonts and the SoundFont are copied into the build by the alphaTab Vite
@@ -231,6 +266,8 @@ export class TabMedia extends EventTarget implements MediaLike {
     api.error.on((e) => this.fail(e));
     api.scoreLoaded.on((score) => {
       if (!score.tracks[this.track]) this.track = 0;
+      // alphaTab renders right after this event, with the settings as they are now.
+      this.applyView();
       this.ready.score = true;
       this.applyPitch();
       this.onTracks(trackList(score.tracks), this.track);
@@ -299,7 +336,17 @@ export class TabMedia extends EventTarget implements MediaLike {
 }
 
 function trackList(tracks: model.Track[]): TabTrack[] {
-  return tracks.map((t, i) => ({ index: i, name: t.name || `Track ${i + 1}` }));
+  return tracks.map((t, i) => ({ index: i, name: t.name || `Track ${i + 1}`, switchable: isSwitchable(t) }));
+}
+
+// Notation and tablature can be on one staff (Guitar Pro) or on two (a
+// MusicXML part with a TAB staff). These are the same tests alphaTab's own
+// score and tab stave factories make: tablature needs strings to draw, and a
+// percussion staff never gets one.
+function isSwitchable(track: model.Track): boolean {
+  const score = track.staves.some((s) => s.showStandardNotation);
+  const tab = track.staves.some((s) => s.showTablature && s.tuning.length > 0 && !s.isPercussion);
+  return score && tab;
 }
 
 /** Artist and title from a tab file's own metadata, for the Add song dialog. */

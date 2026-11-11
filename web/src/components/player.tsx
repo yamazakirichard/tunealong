@@ -25,7 +25,7 @@ import { useLibrary } from "../lib/library";
 import { loopSeek, mapPosition } from "../lib/loop";
 import * as prefs from "../lib/prefs";
 import { clampPitch, clampTempo, shortcut, TEMPO_MAX, TEMPO_MIN } from "../lib/shortcuts";
-import { type MediaLike, TabMedia, tabErrors, tabPitch, type TabTrack } from "../lib/tabMedia";
+import { type MediaLike, TAB_VIEWS, TabMedia, tabErrors, tabPitch, type TabTrack, type TabView } from "../lib/tabMedia";
 import { buttonClass, inputClass, plainButtonClass } from "./dialog";
 import { useToast } from "./toasts";
 
@@ -128,6 +128,16 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     tabRef.current?.zoom(zoom);
     prefs.save("tabZoom", zoom);
   }, [isTab, zoom]);
+  const [view, setView] = useState<TabView>(() => {
+    const v = prefs.load<string>("tabView", "both");
+    return (TAB_VIEWS as readonly string[]).includes(v) ? (v as TabView) : "both";
+  });
+  useEffect(() => {
+    if (!isTab) return;
+    tabRef.current?.setView(view);
+    prefs.save("tabView", view);
+  }, [isTab, view]);
+  const switchable = tracks.find((t) => t.index === trackShown)?.switchable ?? false;
   const graphRef = useRef<Graph | null>(null);
   // A saved A is where the song starts, B or no B: seek there once the media can take it (original timeline).
   const startAt = useRef<number | null>(null);
@@ -627,6 +637,8 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         return v?.playbackRate;
       },
       zoom,
+      view,
+      switchable,
       get paused() {
         return v?.paused;
       },
@@ -951,6 +963,22 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
                     {t.name}
                   </option>
                 ))}
+              </select>
+            </label>
+          )}
+
+          {switchable && (
+            <label className="flex items-center gap-1">
+              Show
+              <select
+                aria-label="Show"
+                className="rounded bg-white/10 text-white text-sm py-0.5 border-white/20"
+                value={view}
+                onChange={(e) => setView(e.target.value as TabView)}
+              >
+                <option value="both" className="text-black">Score + tab</option>
+                <option value="tab" className="text-black">Tab</option>
+                <option value="score" className="text-black">Score</option>
               </select>
             </label>
           )}

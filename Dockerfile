@@ -61,7 +61,7 @@ COPY e2e/package.json e2e/package-lock.json e2e/
 RUN cd e2e && npm ci --no-audit --no-fund
 COPY api/tests api/tests
 COPY scripts scripts
-COPY fixtures/cache_keys.json fixtures/scale.musicxml fixtures/
+COPY fixtures/cache_keys.json fixtures/scale.musicxml fixtures/scale-staves.musicxml fixtures/
 RUN ./scripts/make_fixtures.sh >/dev/null
 COPY --from=web /web/dist web/dist
 COPY e2e e2e

@@ -7,6 +7,9 @@ import { card, closePlayer, jobs, presets, reset, saveAs, sb } from "./helpers";
 // A two-bar C major scale written for these tests (fixtures/scale.musicxml).
 const SCALE = fileURLToPath(new URL("../../fixtures/scale.musicxml", import.meta.url));
 const TITLE = "Fixture Scale";
+// The same scale on a notation staff over a TAB staff (fixtures/scale-staves.musicxml).
+const STAVES = fileURLToPath(new URL("../../fixtures/scale-staves.musicxml", import.meta.url));
+const STAVES_TITLE = "Fixture Scale Staves";
 
 test.beforeEach(async ({ request }) => reset(request));
 
@@ -142,6 +145,48 @@ test("zoom scales the score and is remembered", async ({ page }) => {
   await page.getByTestId("zoom").click();
   await expect(page.getByTestId("zoom")).toHaveText("100%");
   await expect.poll(height).toBeLessThan(before * 1.1);
+});
+
+test("a tab-only track has no score/tab switch", async ({ page }) => {
+  await uploadScale(page); // a single TAB staff
+  await openTab(page);
+  expect((await sb(page)).switchable).toBe(false);
+  await expect(page.getByRole("combobox", { name: "Show" })).toHaveCount(0);
+});
+
+test("score + tab, tab only or score only, remembered", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Add song" }).click();
+  await page.getByRole("radio", { name: "Tab file" }).click();
+  await page.locator("input[name=tab-file]").setInputFiles(STAVES);
+  await expect(page.locator("input[name=title]")).toHaveValue(STAVES_TITLE);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await card(page, STAVES_TITLE).getByRole("button", { name: `Play ${STAVES_TITLE}` }).click();
+  await expect.poll(async () => (await sb(page)).length, { message: "tab loaded" }).toBeGreaterThan(3);
+  expect((await sb(page)).switchable, "notation staff + TAB staff").toBe(true);
+  const height = () => page.locator(".player-tab .at-surface").evaluate((e) => e.getBoundingClientRect().height);
+  await expect.poll(height, { message: "score drawn" }).toBeGreaterThan(50);
+  const both = await height();
+  const show = page.getByRole("combobox", { name: "Show" });
+  await expect(show).toHaveValue("both");
+
+  // One staff fewer per system each way.
+  await show.selectOption("tab");
+  await expect.poll(height, { message: "tab only is shorter" }).toBeLessThan(both * 0.85);
+  const tab = await height();
+  await show.selectOption("score");
+  await expect.poll(height, { message: "score only is shorter" }).toBeLessThan(both * 0.85);
+  await expect.poll(height, { message: "score is not the tab layout" }).not.toBeCloseTo(tab, 0);
+  expect((await sb(page)).errors).toEqual([]);
+
+  // Per browser: the next tab opens the same way.
+  await closePlayer(page);
+  await card(page, STAVES_TITLE).getByRole("button", { name: `Play ${STAVES_TITLE}` }).click();
+  await expect.poll(async () => (await sb(page)).length, { message: "tab loaded" }).toBeGreaterThan(3);
+  await expect(show).toHaveValue("score");
+  await expect.poll(height).toBeLessThan(both * 0.85);
+  await show.selectOption("both");
+  await expect.poll(height).toBeCloseTo(both, 0);
 });
 
 test("an A/B loop on a tab song stays between A and B", async ({ page }) => {
