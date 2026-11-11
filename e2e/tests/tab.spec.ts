@@ -115,6 +115,35 @@ test("player controls stay clickable over the score", async ({ page }) => {
   expect((await sb(page)).pitch).toBe(before + 1);
 });
 
+test("zoom scales the score and is remembered", async ({ page }) => {
+  await uploadScale(page);
+  await openTab(page);
+  const height = () => page.locator(".player-tab .at-surface").evaluate((e) => e.getBoundingClientRect().height);
+  await expect.poll(height, { message: "score drawn" }).toBeGreaterThan(50);
+  const before = await height();
+  await expect(page.getByTestId("zoom")).toHaveText("100%");
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.getByTestId("zoom")).toHaveText("150%");
+  await expect.poll(height, { message: "score grew" }).toBeGreaterThan(before * 1.3);
+  expect((await sb(page)).errors).toEqual([]);
+
+  // Per browser: the next tab opens at the same zoom.
+  await closePlayer(page);
+  await openTab(page);
+  await expect(page.getByTestId("zoom")).toHaveText("150%");
+  await expect.poll(height).toBeGreaterThan(before * 1.3);
+
+  // The percentage resets to 100%.
+  await page.getByTestId("zoom").click();
+  await expect(page.getByTestId("zoom")).toHaveText("100%");
+  await expect.poll(height).toBeLessThan(before * 1.1);
+});
+
 test("an A/B loop on a tab song stays between A and B", async ({ page }) => {
   await uploadScale(page);
   await openTab(page);

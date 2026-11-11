@@ -57,6 +57,7 @@ export class TabMedia extends EventTarget implements MediaLike {
   private rate = 1;
   private semitones = 0;
   private gain = 1;
+  private scale = 1;
   private url = "";
   private track: number;
   private destroyed = false;
@@ -137,6 +138,16 @@ export class TabMedia extends EventTarget implements MediaLike {
   load() {}
   removeAttribute() {}
 
+  /** Zoom the score (1 = alphaTab's own size). Notation and text scale together. */
+  zoom(scale: number) {
+    if (scale === this.scale) return;
+    this.scale = scale;
+    if (!this.api) return;
+    this.api.settings.display.scale = scale;
+    this.api.updateSettings();
+    if (this.ready.score) this.api.render();
+  }
+
   /** Show a different track. Playback still plays every track. */
   showTrack(index: number) {
     const tracks = this.api?.score?.tracks;
@@ -204,7 +215,7 @@ export class TabMedia extends EventTarget implements MediaLike {
     const asset = (p: string) => new URL(p, document.baseURI).href;
     const api = new at.AlphaTabApi(this.container, {
       core: { fontDirectory: asset("font/"), includeNoteBounds: false },
-      display: { layoutMode: at.LayoutMode.Page, staveProfile: at.StaveProfile.Default },
+      display: { layoutMode: at.LayoutMode.Page, staveProfile: at.StaveProfile.Default, scale: this.scale },
       player: {
         playerMode: at.PlayerMode.EnabledSynthesizer,
         soundFont: asset("soundfont/sonivox.sf2"),

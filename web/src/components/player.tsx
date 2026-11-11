@@ -14,6 +14,8 @@ import {
   MdVolumeDown,
   MdVolumeOff,
   MdVolumeUp,
+  MdZoomIn,
+  MdZoomOut,
 } from "react-icons/md";
 
 import { api, errorText, type Playback, type Preset, type Song } from "../lib/api";
@@ -57,6 +59,10 @@ function fromPlayback(songId: number, pb: Playback, preset: Preset | null): Load
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const browserVolume = () => prefs.load("volume", 1);
+// Tab zoom: per browser, since the right size is about the screen, not the song.
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2;
+const clampZoom = (z: number) => Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
 // The slider runs to 2 (200%). Up to 1 it's squared, so its middle sounds like half;
 // above 1 it's linear, so 2 is double the original level (+6 dB) and may clip.
 const VOLUME_MAX = 2;
@@ -116,6 +122,12 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     });
     videoRef.current = tabRef.current;
   }
+  const [zoom, setZoom] = useState(() => clampZoom(Number(prefs.load("tabZoom", 1)) || 1));
+  useEffect(() => {
+    if (!isTab) return;
+    tabRef.current?.zoom(zoom);
+    prefs.save("tabZoom", zoom);
+  }, [isTab, zoom]);
   const graphRef = useRef<Graph | null>(null);
   // A saved A is where the song starts, B or no B: seek there once the media can take it (original timeline).
   const startAt = useRef<number | null>(null);
@@ -614,6 +626,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       get playbackRate() {
         return v?.playbackRate;
       },
+      zoom,
       get paused() {
         return v?.paused;
       },
@@ -940,6 +953,20 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
                 ))}
               </select>
             </label>
+          )}
+
+          {isTab && (
+            <div className="flex items-center gap-1" role="group" aria-label="Zoom">
+              <button type="button" className={ctl} aria-label="Zoom out" onClick={() => setZoom((z) => clampZoom(z - 0.1))} disabled={zoom <= ZOOM_MIN}>
+                <MdZoomOut />
+              </button>
+              <button type="button" data-testid="zoom" className={classNames(ctl, "w-14 tabular-nums")} onClick={() => setZoom(1)} disabled={zoom === 1} title="Back to 100%">
+                {Math.round(zoom * 100)}%
+              </button>
+              <button type="button" className={ctl} aria-label="Zoom in" onClick={() => setZoom((z) => clampZoom(z + 0.1))} disabled={zoom >= ZOOM_MAX}>
+                <MdZoomIn />
+              </button>
+            </div>
           )}
 
           <div className="flex items-center gap-1 ml-auto">
