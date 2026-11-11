@@ -47,5 +47,10 @@ alphaTab — https://github.com/CoderLine/alphaTab
     Sonivox EAS SoundFont (sonivox.sf2/.sf3) — Copyright (C) 2004-2006 Sonic
       Network Inc., Apache License 2.0 (web/dist/soundfont/, with LICENSE).
 
+Material Design Icons — https://github.com/Templarian/MaterialDesign
+  The "guitar-acoustic" icon path (@mdi/svg 7.4.47), recoloured, as the app
+  icon in web/public/favicon.svg (also inlined on the songbook-door login
+  page outside this repository). Licence: Apache-2.0 (Pictogrammers).
+
 Runtime tools (not distributed in this repository; installed in the image):
   Rubber Band Library / rubberband-cli (GPL-2.0-or-later), FFmpeg (LGPL/GPL).
