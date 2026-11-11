@@ -702,7 +702,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         {isTab ? (
           <div
             data-testid="player-tab"
-            className="player-tab isolate flex-1 min-h-0 w-full overflow-auto bg-white text-black pt-10 pb-32"
+            className="player-tab isolate flex-1 min-h-0 w-full overflow-auto bg-white text-black pt-2 pb-32"
             ref={(scroller) => {
               const host = scroller?.firstElementChild as HTMLElement | null;
               if (scroller && host) tabRef.current?.attach(host, scroller);
@@ -736,12 +736,9 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         />
         )}
 
-        <div
-          className={classNames(
-            "absolute top-0 left-0 right-12 flex items-center gap-2 px-3 py-2 text-sm pointer-events-none",
-            isTab && "bg-black/80",
-          )}
-        >
+        {/* Over a video only: a tab's score prints its own title, and a strip there hid the music. */}
+        {!isTab && (
+        <div className="absolute top-0 left-0 right-12 flex items-center gap-2 px-3 py-2 text-sm pointer-events-none">
           <span className="font-semibold truncate drop-shadow">{song.title}</span>
           <span
             data-testid="render-badge"
@@ -764,6 +761,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
             </span>
           )}
         </div>
+        )}
         <button
           type="button"
           aria-label="Close"

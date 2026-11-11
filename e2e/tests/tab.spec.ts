@@ -53,6 +53,8 @@ test("a tab song plays in alphaTab, with live tempo and pitch, and saving render
   expect(s.kind).toBe("tab");
   expect(s.graph).toBe("tab");
   expect(s.badge).toBe("tab");
+  // No title strip over the score: the score prints its own title.
+  await expect(page.getByTestId("render-badge")).toHaveCount(0);
   expect(s.errors).toEqual([]);
   // Two bars of 4/4 at 120 bpm.
   expect(s.length).toBeGreaterThan(3.5);
