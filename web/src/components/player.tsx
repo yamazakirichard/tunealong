@@ -677,7 +677,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
         {isTab ? (
           <div
             data-testid="player-tab"
-            className="player-tab flex-1 min-h-0 w-full overflow-auto bg-white text-black pt-10 pb-32"
+            className="player-tab isolate flex-1 min-h-0 w-full overflow-auto bg-white text-black pt-10 pb-32"
             ref={(scroller) => {
               const host = scroller?.firstElementChild as HTMLElement | null;
               if (scroller && host) tabRef.current?.attach(host, scroller);

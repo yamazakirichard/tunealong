@@ -85,6 +85,36 @@ test("a tab song plays in alphaTab, with live tempo and pitch, and saving render
   expect(await jobs(request, "render")).toHaveLength(0);
 });
 
+test("player controls stay clickable over the score", async ({ page }) => {
+  // A short window puts the score under the control bar, as a long song does.
+  // alphaTab gives its score chunks z-index 1 and its cursors 1000.
+  await uploadScale(page);
+  await page.setViewportSize({ width: 1000, height: 300 });
+  await openTab(page);
+  const buttons = await page.evaluate(() => {
+    document.querySelector<HTMLElement>("[data-testid=player-tab]")!.scrollTop = 0;
+    const chunks = [...document.querySelectorAll<HTMLElement>(".player-tab .at-surface > div")].map((c) => c.getBoundingClientRect());
+    return [...document.querySelectorAll<HTMLElement>("[data-testid=player-controls] button")].map((b) => {
+      const r = b.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        label: b.getAttribute("aria-label") ?? b.textContent,
+        overScore: chunks.some((c) => x >= c.left && x <= c.right && y >= c.top && y <= c.bottom),
+        // A toast may cover a corner; what matters is the score never does.
+        underScore: !!hit?.closest(".player-tab"),
+      };
+    });
+  });
+  expect(buttons.some((b) => b.overScore), "the score reaches under the controls").toBe(true);
+  expect(buttons.filter((b) => b.underScore)).toEqual([]);
+
+  const before = (await sb(page)).pitch;
+  await page.getByRole("button", { name: "Pitch up 1" }).click({ timeout: 2000 });
+  expect((await sb(page)).pitch).toBe(before + 1);
+});
+
 test("an A/B loop on a tab song stays between A and B", async ({ page }) => {
   await uploadScale(page);
   await openTab(page);
