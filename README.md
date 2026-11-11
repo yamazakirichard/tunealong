@@ -1,6 +1,7 @@
 # Songbook
 
-A self-hosted library for playing along to songs downloaded from YouTube.
+A self-hosted library for playing along to songs: downloaded from YouTube,
+recorded from a browser tab, or loaded from Guitar Pro / MusicXML tab files.
 
 - Your songs appear in a grid grouped by artist (or by your own categories),
   in a style forked from [Homepage](https://github.com/gethomepage/homepage).
