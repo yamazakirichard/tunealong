@@ -1,4 +1,4 @@
-# Run every target from this directory (Songbook/). Nothing here reaches outside it.
+# Run every target from this directory (TuneAlong/). Nothing here reaches outside it.
 SHELL := /bin/bash
 VENV  := api/.venv
 PY    := $(VENV)/bin/python
@@ -25,8 +25,8 @@ test-api: venv fixtures
 # The backend suite inside the image, with the real ffmpeg and rubberband
 # (test_render.py skips locally when rubberband isn't installed).
 test-docker:
-	docker build -q --target test -t songbook:test . >/dev/null
-	docker run --rm songbook:test
+	docker build -q --target test -t tunealong:test . >/dev/null
+	docker run --rm tunealong:test
 
 test-web: web/node_modules
 	cd web && npx vitest run
@@ -38,8 +38,8 @@ web/node_modules: web/package-lock.json
 # Playwright in Docker (Chromium, Python, ffmpeg and rubberband in one image),
 # against scripts/dev_stack.py with the built UI and a fake MeTube.
 e2e:
-	docker build -q --target e2e -t songbook:e2e . >/dev/null
-	docker run --rm --ipc=host songbook:e2e
+	docker build -q --target e2e -t tunealong:e2e . >/dev/null
+	docker run --rm --ipc=host tunealong:e2e
 
 # Gate 7: the compose deployment end to end (needs host port 8080 free).
 compose-test:

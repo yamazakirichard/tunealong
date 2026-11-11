@@ -4,8 +4,8 @@ import subprocess
 
 import pytest
 
-from songbook import import_legacy, importer
-from songbook.media import sha256_file
+from tunealong import import_legacy, importer
+from tunealong.media import sha256_file
 
 from .conftest import FIXTURES
 
@@ -25,7 +25,7 @@ def audio_m4a(tmp_path_factory):
 
 @pytest.fixture
 def legacy(tmp_path, audio_m4a):
-    """A legacy MeTube folder with real-world names, outside SONGBOOK_ROOT."""
+    """A legacy MeTube folder with real-world names, outside TUNEALONG_ROOT."""
     d = tmp_path / "legacy"
     d.mkdir()
     src = FIXTURES / "originals"

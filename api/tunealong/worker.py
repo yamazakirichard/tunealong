@@ -1,4 +1,4 @@
-"""The single background worker: `python -m songbook.worker`.
+"""The single background worker: `python -m tunealong.worker`.
 
 There is exactly one worker, so on startup anything still `running` was
 orphaned by a crash and goes back to `pending`.
@@ -103,7 +103,7 @@ class Worker:
                 log.warning("heartbeat: %s", e)
 
     def maybe_gc(self) -> None:
-        """Evict renders over SONGBOOK_CACHE_MAX_GB. Runs between jobs, so never mid-render."""
+        """Evict renders over TUNEALONG_CACHE_MAX_GB. Runs between jobs, so never mid-render."""
         self._next_gc = time.monotonic() + self.settings.gc_interval_s
         if self.settings.cache_max_gb is None:
             return

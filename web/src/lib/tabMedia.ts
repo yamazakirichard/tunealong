@@ -246,7 +246,7 @@ export class TabMedia extends EventTarget implements MediaLike {
     this.ready = { score: false, player: false, midi: false };
     // Fonts and the SoundFont are copied into the build by the alphaTab Vite
     // plugin, next to index.html. Resolve them against the page, which works
-    // under any SONGBOOK_BASE_PATH.
+    // under any TUNEALONG_BASE_PATH.
     const asset = (p: string) => new URL(p, document.baseURI).href;
     const api = new at.AlphaTabApi(this.container, {
       core: { fontDirectory: asset("font/"), includeNoteBounds: false },

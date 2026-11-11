@@ -9,10 +9,10 @@
 #   1. defaults only (cp .env.example .env): healthy, UI at localhost:8080, no
 #      auth, rubberband + ffmpeg in the image, files owned by PUID:PGID (1000)
 #   2. fake MeTube override: Playwright smoke subset against the containers
-#   3. PUID/PGID 1234 + SONGBOOK_BASE_PATH=/songbook + fake MeTube: the smoke
+#   3. PUID/PGID 1234 + TUNEALONG_BASE_PATH=/tunealong + fake MeTube: the smoke
 #      subset under the subpath, and every file written is owned by 1234:1234
 #   4. auth on (bcrypt hash written with $$ in .env): 401 / 200, health open
-#   5. static: no hardcoded hostnames, nothing outside Songbook/
+#   5. static: no hardcoded hostnames, nothing outside TuneAlong/
 #
 # GATE_STEPS="1 3" runs only those steps; GATE_KEEP=1 leaves the last stack up.
 set -uo pipefail
@@ -25,10 +25,10 @@ CO="$WORK/checkout"
 FAILED=0
 pass() { printf '  PASS  %s\n' "$*"; }
 fail() { printf '  FAIL  %s\n' "$*"; FAILED=1; }
-check() { local what=$1; shift; if "$@" >/tmp/songbook-gate-check.log 2>&1; then pass "$what"; else fail "$what"; sed 's/^/        /' /tmp/songbook-gate-check.log | tail -15; fi; }
+check() { local what=$1; shift; if "$@" >/tmp/tunealong-gate-check.log 2>&1; then pass "$what"; else fail "$what"; sed 's/^/        /' /tmp/tunealong-gate-check.log | tail -15; fi; }
 
-as_root() { docker run --rm --user 0 --entrypoint sh -v "$WORK:/w" songbook:latest -c "$1"; }
-probe() { docker run --rm --network host --entrypoint python -v "$SB/scripts:/s:ro" songbook:latest /s/http_probe.py "$@"; }
+as_root() { docker run --rm --user 0 --entrypoint sh -v "$WORK:/w" tunealong:latest -c "$1"; }
+probe() { docker run --rm --network host --entrypoint python -v "$SB/scripts:/s:ro" tunealong:latest /s/http_probe.py "$@"; }
 # Shell variables beat .env in Compose, and a PUID/PGID exported by the calling
 # environment (common in linuxserver-style containers) would silently win. So
 # every key .env.example defines is unset for compose; .env is the only source.
@@ -56,7 +56,7 @@ owned_by() {  # owned_by uid:gid dir — every file and dir under it
 }
 
 smoke() {  # smoke base-url
-    docker run --rm --network host --ipc=host -e E2E_BASE_URL="$1" songbook:e2e npx playwright test 2>&1 | grep -E "✓|✘|passed|failed|Error" ; return "${PIPESTATUS[0]}"
+    docker run --rm --network host --ipc=host -e E2E_BASE_URL="$1" tunealong:e2e npx playwright test 2>&1 | grep -E "✓|✘|passed|failed|Error" ; return "${PIPESTATUS[0]}"
 }
 
 down() { [ "${GATE_KEEP:-0}" = 1 ] && { echo "  (GATE_KEEP=1: leaving the stack up)"; return; }; dc -f compose.yml -f compose.fake-metube.yml down -v --remove-orphans >/dev/null 2>&1; as_root "rm -rf /w/checkout/data" >/dev/null 2>&1; }
@@ -72,7 +72,7 @@ set_env() {  # set_env KEY=VALUE... — appended to a fresh copy of .env.example
 }
 
 echo "== preparing a clean checkout in .compose-test/"
-if docker compose ls -q | grep -qx songbook; then echo "a compose project named 'songbook' is already running; stop it first"; exit 2; fi
+if docker compose ls -q | grep -qx tunealong; then echo "a compose project named 'tunealong' is already running; stop it first"; exit 2; fi
 rm -rf "$CO" 2>/dev/null || as_root "rm -rf /w/checkout"
 mkdir -p "$CO"
 (cd "$SB" && git ls-files -z --cached --others --exclude-standard . | tar --null -T - -cf -) | tar -xf - -C "$CO"
@@ -80,14 +80,14 @@ mkdir -p "$CO"
 
 echo "== building images (app, test, e2e)"
 dc -f compose.yml -f compose.fake-metube.yml build -q || exit 1
-docker build -q --target e2e -t songbook:e2e "$CO" >/dev/null || exit 1
+docker build -q --target e2e -t tunealong:e2e "$CO" >/dev/null || exit 1
 
 if want 1; then
 echo "== 1. defaults: cp .env.example .env && docker compose up -d"
 cp "$CO/.env.example" "$CO/.env"
 dc up -d >/dev/null 2>&1
 check "api, worker and metube reach healthy" wait_healthy api worker metube
-check "UI loads at http://localhost:8080" probe http://localhost:8080/ --contains "<title>Songbook</title>"
+check "UI loads at http://localhost:8080" probe http://localhost:8080/ --contains "<title>TuneAlong</title>"
 check "API answers without auth" probe http://localhost:8080/api/library --contains '"Unsorted"'
 check "rubberband --version in the image" dc exec -T api rubberband --version
 check "ffmpeg -version in the image" dc exec -T api ffmpeg -version
@@ -106,24 +106,24 @@ down
 fi
 
 if want 3; then
-echo "== 3. PUID/PGID 1234 + SONGBOOK_BASE_PATH=/songbook (fake MeTube)"
-set_env PUID=1234 PGID=1234 SONGBOOK_BASE_PATH=/songbook
+echo "== 3. PUID/PGID 1234 + TUNEALONG_BASE_PATH=/tunealong (fake MeTube)"
+set_env PUID=1234 PGID=1234 TUNEALONG_BASE_PATH=/tunealong
 dc -f compose.yml -f compose.fake-metube.yml up -d >/dev/null 2>&1
 check "stack is healthy under the subpath" wait_healthy api worker metube
-check "UI loads at /songbook/" probe http://localhost:8080/songbook/ --contains "<title>Songbook</title>"
-check "/songbook redirects to /songbook/" probe http://localhost:8080/songbook --expect 308
-check "API at /songbook/api/health" probe http://localhost:8080/songbook/api/health --contains ok
+check "UI loads at /tunealong/" probe http://localhost:8080/tunealong/ --contains "<title>TuneAlong</title>"
+check "/tunealong redirects to /tunealong/" probe http://localhost:8080/tunealong --expect 308
+check "API at /tunealong/api/health" probe http://localhost:8080/tunealong/api/health --contains ok
 check "nothing served at the root" probe http://localhost:8080/api/health --expect 404
-check "smoke subset (UI, API, media) passes under /songbook/" smoke http://localhost:8080/songbook/
+check "smoke subset (UI, API, media) passes under /tunealong/" smoke http://localhost:8080/tunealong/
 check "every file written is owned by 1234:1234" owned_by 1234:1234
 down
 fi
 
 if want 4; then
 echo "== 4. built-in auth (hash written with \$\$ in .env)"
-HASH=$(docker run --rm --entrypoint python songbook:latest -c "import bcrypt; print(bcrypt.hashpw(b'gate pass', bcrypt.gensalt(rounds=10)).decode())")
-set_env SONGBOOK_AUTH_USER=gate "SONGBOOK_AUTH_PASSWORD_HASH=${HASH//\$/\$\$}"
-grep -q 'SONGBOOK_AUTH_PASSWORD_HASH=\$\$2b\$\$' "$CO/.env" && pass ".env holds the hash with \$\$" || fail ".env hash escaping"
+HASH=$(docker run --rm --entrypoint python tunealong:latest -c "import bcrypt; print(bcrypt.hashpw(b'gate pass', bcrypt.gensalt(rounds=10)).decode())")
+set_env TUNEALONG_AUTH_USER=gate "TUNEALONG_AUTH_PASSWORD_HASH=${HASH//\$/\$\$}"
+grep -q 'TUNEALONG_AUTH_PASSWORD_HASH=\$\$2b\$\$' "$CO/.env" && pass ".env holds the hash with \$\$" || fail ".env hash escaping"
 dc up -d api >/dev/null 2>&1
 check "api is healthy with auth on" wait_healthy api
 check "/api/health stays open" probe http://localhost:8080/api/health
@@ -131,13 +131,13 @@ check "unauthenticated API request gets 401" probe http://localhost:8080/api/lib
 check "unauthenticated UI request gets 401" probe http://localhost:8080/ --expect 401
 check "wrong password gets 401" probe http://localhost:8080/api/library --user gate --password nope --expect 401
 check "right password gets 200 (API)" probe http://localhost:8080/api/library --user gate --password "gate pass"
-check "right password gets 200 (UI)" probe http://localhost:8080/ --user gate --password "gate pass" --contains "<title>Songbook</title>"
+check "right password gets 200 (UI)" probe http://localhost:8080/ --user gate --password "gate pass" --contains "<title>TuneAlong</title>"
 down
 fi
 
 if want 5; then
 echo "== 5. static checks"
-check "no hardcoded hostnames; nothing references a path outside Songbook/" python3 "$SB/scripts/check_self_contained.py"
+check "no hardcoded hostnames; nothing references a path outside TuneAlong/" python3 "$SB/scripts/check_self_contained.py"
 fi
 
 [ "${GATE_KEEP:-0}" = 1 ] || as_root "rm -rf /w/checkout" >/dev/null 2>&1

@@ -3,8 +3,8 @@ import dataclasses
 import pytest
 from fastapi.testclient import TestClient
 
-from songbook.main import create_app
-from songbook.youtube import oembed
+from tunealong.main import create_app
+from tunealong.youtube import oembed
 
 from .conftest import FIXTURES
 from .fake_metube import FakeMetube, Server
@@ -51,6 +51,6 @@ def test_youtube_unreachable_still_answers(settings):
 
 
 def test_disabled_never_calls_out(settings, monkeypatch):
-    monkeypatch.setattr("songbook.routes.youtube.oembed", lambda *a: pytest.fail("called oEmbed"))
+    monkeypatch.setattr("tunealong.routes.youtube.oembed", lambda *a: pytest.fail("called oEmbed"))
     with TestClient(create_app(dataclasses.replace(settings, oembed_url=""))) as c:
         assert c.get("/api/youtube", params={"url": "E0ozmU9cJDg"}).json()["yt_title"] is None

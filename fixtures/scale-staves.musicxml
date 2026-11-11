@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Songbook test fixture: the C major scale of scale.musicxml on two staves,
+<!-- TuneAlong test fixture: the C major scale of scale.musicxml on two staves,
      standard notation over tablature, as a Guitar Pro file usually shows it. -->
 <score-partwise version="4.0">
   <work><work-title>Fixture Scale Staves</work-title></work>
-  <identification><creator type="composer">Songbook Fixtures</creator></identification>
+  <identification><creator type="composer">TuneAlong Fixtures</creator></identification>
   <part-list>
     <score-part id="P1"><part-name>Guitar</part-name>
       <midi-instrument id="P1-I1"><midi-program>26</midi-program></midi-instrument>

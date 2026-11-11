@@ -1,5 +1,5 @@
-Songbook
-Copyright (C) 2026 Songbook contributors
+TuneAlong
+Copyright (C) 2026 TuneAlong contributors
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -49,7 +49,7 @@ alphaTab — https://github.com/CoderLine/alphaTab
 
 Material Design Icons — https://github.com/Templarian/MaterialDesign
   The "guitar-acoustic" icon path (@mdi/svg 7.4.47), recoloured, as the app
-  icon in web/public/favicon.svg (also inlined on the songbook-door login
+  icon in web/public/favicon.svg (also inlined on the tunealong-door login
   page outside this repository). Licence: Apache-2.0 (Pictogrammers).
 
 Runtime tools (not distributed in this repository; installed in the image):

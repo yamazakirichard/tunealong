@@ -4,18 +4,18 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from songbook import config, db
-from songbook.main import create_app
+from tunealong import config, db
+from tunealong.main import create_app
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"
 
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch) -> config.Settings:
-    """A temp SONGBOOK_ROOT with the standard directory layout."""
-    root = tmp_path / "songbook"
-    monkeypatch.setenv("SONGBOOK_ROOT", str(root))
-    monkeypatch.setenv("SONGBOOK_AUDIODB_URL", "")  # tests never reach TheAudioDB; test_artist_images uses the fake
+    """A temp TUNEALONG_ROOT with the standard directory layout."""
+    root = tmp_path / "tunealong"
+    monkeypatch.setenv("TUNEALONG_ROOT", str(root))
+    monkeypatch.setenv("TUNEALONG_AUDIODB_URL", "")  # tests never reach TheAudioDB; test_artist_images uses the fake
     s = config.load()
     config.ensure_dirs(s)
     return s

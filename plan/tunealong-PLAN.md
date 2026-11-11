@@ -1,3 +1,5 @@
+> Renamed Songbook → TuneAlong on 2026-11-11 (the name collided with ~1450 GitHub repos). This plan is kept as written, under the old name.
+
 Songbook — Implementation Plan
 > Instructions for Claude Code: work through the phases **in order**. Each phase ends with a **Gate**. Do not start the next phase until every test in the gate passes and you have shown me the test output. When a gate passes, commit that phase (only files under `Songbook/`) and push. If a decision isn't covered here, make the simplest choice, write it down in `DECISIONS.md`, and keep going. Ask me only about things that are hard to reverse.
 ---

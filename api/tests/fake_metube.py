@@ -1,8 +1,8 @@
 """A stand-in for MeTube, speaking the same /add, /history and /delete contract.
 
-It also answers YouTube's /oembed (SONGBOOK_OEMBED_URL points here in tests),
+It also answers YouTube's /oembed (TUNEALONG_OEMBED_URL points here in tests),
 with titles from OEMBED_TITLES or "YouTube title <id>", like its info.json, and
-TheAudioDB's search (SONGBOOK_AUDIODB_URL=<fake>/audiodb), knowing the artists
+TheAudioDB's search (TUNEALONG_AUDIODB_URL=<fake>/audiodb), knowing the artists
 in AUDIODB_ARTISTS, with a tiny PNG for each.
 
 It records every /add call and, after a short delay, "downloads" by copying a
@@ -28,7 +28,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from songbook.youtube import parse_id
+from tunealong.youtube import parse_id
 
 
 # Video ID → (title, channel) for /oembed, for the Add song guess.

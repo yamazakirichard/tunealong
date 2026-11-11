@@ -9,9 +9,9 @@ import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
-from songbook import cache, config, ingest
-from songbook.main import create_app
-from songbook.worker import Worker
+from tunealong import cache, config, ingest
+from tunealong.main import create_app
+from tunealong.worker import Worker
 
 HASH = bcrypt.hashpw(b"s3cret pass", bcrypt.gensalt(rounds=4)).decode()
 
@@ -36,7 +36,7 @@ def make(settings, **kw):
 # --- config ---------------------------------------------------------------------
 
 @pytest.mark.parametrize("raw,expected", [
-    ("", ""), ("/", ""), ("songbook", "/songbook"), ("/songbook/", "/songbook"), ("/a/b", "/a/b"), (" /x ", "/x"),
+    ("", ""), ("/", ""), ("tunealong", "/tunealong"), ("/tunealong/", "/tunealong"), ("/a/b", "/a/b"), (" /x ", "/x"),
 ])
 def test_normalize_base_path(raw, expected):
     assert config.normalize_base_path(raw) == expected
@@ -49,13 +49,13 @@ def test_bad_base_path_is_rejected(raw):
 
 
 def test_env_settings(monkeypatch, tmp_path):
-    monkeypatch.setenv("SONGBOOK_ROOT", str(tmp_path))
-    monkeypatch.setenv("SONGBOOK_BASE_PATH", "songbook/")
-    monkeypatch.setenv("SONGBOOK_CACHE_MAX_GB", "2.5")
-    monkeypatch.setenv("SONGBOOK_AUTH_USER", "me")
+    monkeypatch.setenv("TUNEALONG_ROOT", str(tmp_path))
+    monkeypatch.setenv("TUNEALONG_BASE_PATH", "tunealong/")
+    monkeypatch.setenv("TUNEALONG_CACHE_MAX_GB", "2.5")
+    monkeypatch.setenv("TUNEALONG_AUTH_USER", "me")
     s = config.load()
-    assert (s.base_path, s.cache_max_gb, s.auth_enabled) == ("/songbook", 2.5, False)  # no hash: auth stays off
-    monkeypatch.setenv("SONGBOOK_AUTH_PASSWORD_HASH", HASH)
+    assert (s.base_path, s.cache_max_gb, s.auth_enabled) == ("/tunealong", 2.5, False)  # no hash: auth stays off
+    monkeypatch.setenv("TUNEALONG_AUTH_PASSWORD_HASH", HASH)
     assert config.load().auth_enabled
 
 
@@ -64,17 +64,17 @@ def test_env_settings(monkeypatch, tmp_path):
 def test_base_path_serves_ui_api_and_media(settings, originals, web, conn):
     ingest.scan(conn, settings)
     sid = conn.execute("SELECT id FROM songs WHERE youtube_id = 'AAAAAAAAAAA'").fetchone()[0]
-    with make(settings, base_path="/songbook", web_dir=web) as c:
-        assert c.get("/songbook/api/health").json() == {"status": "ok"}
-        assert "./assets/app.js" in c.get("/songbook/").text
-        assert c.get("/songbook/assets/app.js").status_code == 200
-        lib = c.get("/songbook/api/library").json()
+    with make(settings, base_path="/tunealong", web_dir=web) as c:
+        assert c.get("/tunealong/api/health").json() == {"status": "ok"}
+        assert "./assets/app.js" in c.get("/tunealong/").text
+        assert c.get("/tunealong/assets/app.js").status_code == 200
+        lib = c.get("/tunealong/api/library").json()
         song = next(s for g in lib["groups"] for s in g["songs"] if s["id"] == sid)
         # Relative media URLs resolve under the subpath.
-        r = c.get(f"/songbook/{song['media_url']}", headers={"Range": "bytes=0-99"})
+        r = c.get(f"/tunealong/{song['media_url']}", headers={"Range": "bytes=0-99"})
         assert r.status_code == 206 and len(r.content) == 100
-        r = c.get("/songbook", follow_redirects=False)
-        assert r.status_code == 308 and r.headers["location"] == "/songbook/"
+        r = c.get("/tunealong", follow_redirects=False)
+        assert r.status_code == 308 and r.headers["location"] == "/tunealong/"
         assert c.get("/api/health").status_code == 404
         assert c.get("/").status_code == 404
 

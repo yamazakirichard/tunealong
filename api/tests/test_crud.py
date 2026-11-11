@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from songbook import ingest
-from songbook.cache import cache_key
+from tunealong import ingest
+from tunealong.cache import cache_key
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures"
 
@@ -237,16 +237,16 @@ def test_mp4_content_type(client, lib):
 
 
 @pytest.mark.parametrize("path", [
-    "/media/originals/..%2F..%2Fsongbook.sqlite",
-    "/media/originals/%2e%2e%2fsongbook.sqlite",
+    "/media/originals/..%2F..%2Ftunealong.sqlite",
+    "/media/originals/%2e%2e%2ftunealong.sqlite",
     "/media/originals/..",
     "/media/originals/-1",
     "/media/originals/1.0",
     "/media/originals/AAAAAAAAAAA",
     "/media/originals/999",
-    "/media/renders/..%2Fsongbook.sqlite",
+    "/media/renders/..%2Ftunealong.sqlite",
     "/media/renders/1",
-    "/media/originals/1/../../songbook.sqlite",
+    "/media/originals/1/../../tunealong.sqlite",
 ])
 def test_media_traversal_is_404(client, lib, path):
     assert client.get(path).status_code == 404
@@ -256,7 +256,7 @@ def test_db_path_escaping_root_is_404(client, conn, lib):
     sid = lib["AAAAAAAAAAA"]
     conn.execute("UPDATE songs SET original_path = '../../etc/passwd' WHERE id = ?", (sid,))
     assert client.get(f"/media/originals/{sid}").status_code == 404
-    conn.execute("UPDATE songs SET original_path = 'songbook.sqlite' WHERE id = ?", (sid,))
+    conn.execute("UPDATE songs SET original_path = 'tunealong.sqlite' WHERE id = ?", (sid,))
     assert client.get(f"/media/originals/{sid}").status_code == 404
 
 

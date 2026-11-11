@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from songbook import render
-from songbook.cache import cache_key
+from tunealong import render
+from tunealong.cache import cache_key
 
 pytestmark = pytest.mark.skipif(shutil.which("rubberband") is None, reason="rubberband not installed")
 

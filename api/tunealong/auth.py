@@ -1,5 +1,5 @@
-"""Optional HTTP Basic auth, on when SONGBOOK_AUTH_USER and
-SONGBOOK_AUTH_PASSWORD_HASH (bcrypt) are both set. Off by default, for people
+"""Optional HTTP Basic auth, on when TUNEALONG_AUTH_USER and
+TUNEALONG_AUTH_PASSWORD_HASH (bcrypt) are both set. Off by default, for people
 who put their own reverse proxy or SSO in front.
 
 A pure ASGI middleware, so media streaming isn't buffered. bcrypt is slow on
@@ -13,7 +13,7 @@ import hmac
 
 import bcrypt
 
-_CHALLENGE = [(b"www-authenticate", b'Basic realm="Songbook", charset="UTF-8"'),
+_CHALLENGE = [(b"www-authenticate", b'Basic realm="TuneAlong", charset="UTF-8"'),
               (b"content-type", b"text/plain; charset=utf-8")]
 
 

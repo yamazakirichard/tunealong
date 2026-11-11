@@ -1,4 +1,4 @@
-"""H.264 playback copies: `python -m songbook.playback queue <song id>|all`.
+"""H.264 playback copies: `python -m tunealong.playback queue <song id>|all`.
 
 The original keeps the best quality the source offers, usually AV1 or VP9, and
 is never changed. Safari only plays AV1 on Macs with a hardware decoder, so
@@ -89,7 +89,7 @@ def run_next(conn: sqlite3.Connection, settings: config.Settings) -> bool:
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
-    ap = argparse.ArgumentParser(prog="python -m songbook.playback")
+    ap = argparse.ArgumentParser(prog="python -m tunealong.playback")
     sub = ap.add_subparsers(dest="cmd", required=True)
     q = sub.add_parser("queue", help="have the worker (re)check songs and make the copies they need")
     q.add_argument("song", help="a song id, or 'all'")

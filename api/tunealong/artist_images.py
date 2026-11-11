@@ -124,13 +124,13 @@ def remove_file(settings: config.Settings, rel: str | None) -> None:
 
 
 def main() -> None:
-    """Look up every pending artist now: `python -m songbook.artist_images`. The worker does this anyway."""
+    """Look up every pending artist now: `python -m tunealong.artist_images`. The worker does this anyway."""
     import time
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = config.load()
     if not settings.audiodb_url:
-        raise SystemExit("SONGBOOK_AUDIODB_URL is empty: artist pictures are off")
+        raise SystemExit("TUNEALONG_AUDIODB_URL is empty: artist pictures are off")
     config.ensure_dirs(settings)
     conn = db.open_db(settings.db_path, settings.busy_timeout_ms)
     while fetch_one(conn, settings):

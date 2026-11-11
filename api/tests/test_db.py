@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from songbook import db
+from tunealong import db
 
 
 def add_song(conn, youtube_id="AAAAAAAAAAA", **kw):
@@ -64,7 +64,7 @@ def test_pragmas_on_every_connection(settings, conn):
 
 def test_schema_sql_has_no_pragmas():
     from importlib import resources
-    sql = (resources.files("songbook") / "schema.sql").read_text()
+    sql = (resources.files("tunealong") / "schema.sql").read_text()
     stmts = [l for l in sql.splitlines() if not l.strip().startswith("--")]
     assert not any("PRAGMA" in l.upper() for l in stmts)
 
@@ -192,3 +192,31 @@ def test_health(client):
 def test_fixture_copies(originals):
     names = sorted(p.name for p in originals.iterdir() if p.is_file())
     assert names == ["AAAAAAAAAAA.webm", "BBBBBBBBBBB.webm", "CCCCCCCCCCC.mp4"]
+
+
+# --- the Songbook → TuneAlong rename ---------------------------------------------
+
+def test_legacy_songbook_db_is_adopted_with_its_sidecars(settings):
+    from tunealong import config
+
+    legacy = settings.root / config.LEGACY_DB_NAME
+    c = db.open_db(legacy)
+    add_song(c)
+    c.close()
+    (settings.root / (config.LEGACY_DB_NAME + "-wal")).write_bytes(b"")
+    config.ensure_dirs(settings)
+    assert not legacy.exists()
+    assert not (settings.root / (config.LEGACY_DB_NAME + "-wal")).exists()
+    assert (settings.root / "tunealong.sqlite-wal").exists()
+    c = db.open_db(settings.db_path)
+    assert c.execute("SELECT count(*) FROM songs").fetchone()[0] == 1
+
+
+def test_legacy_db_never_replaces_an_existing_library(settings):
+    from tunealong import config
+
+    db.open_db(settings.db_path).close()
+    legacy = settings.root / config.LEGACY_DB_NAME
+    legacy.write_bytes(b"old")
+    config.ensure_dirs(settings)
+    assert legacy.read_bytes() == b"old"

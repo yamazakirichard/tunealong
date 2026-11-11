@@ -1,55 +1,55 @@
-# Songbook: `cp .env.example .env && docker compose up -d`, then open http://localhost:8080
+# TuneAlong: `cp .env.example .env && docker compose up -d`, then open http://localhost:8080
 # Every setting is an environment variable with a default; see .env.example.
-name: songbook
+name: tunealong
 
 x-ids: &ids
   PUID: ${PUID:-1000}
   PGID: ${PGID:-1000}
 
-x-songbook: &songbook
-  image: ${SONGBOOK_IMAGE:-songbook:latest}
+x-tunealong: &tunealong
+  image: ${TUNEALONG_IMAGE:-tunealong:latest}
   build:
     context: .
     target: app
   restart: unless-stopped
   volumes:
-    - ${SONGBOOK_DATA:-./data}:/data
+    - ${TUNEALONG_DATA:-./data}:/data
 
 services:
   api:
-    <<: *songbook
+    <<: *tunealong
     command: ["api"]
     environment:
       <<: *ids
       METUBE_URL: ${METUBE_URL:-http://metube:8081}
-      SONGBOOK_OEMBED_URL: ${SONGBOOK_OEMBED_URL-https://www.youtube.com/oembed}
-      SONGBOOK_BASE_PATH: ${SONGBOOK_BASE_PATH:-}
-      SONGBOOK_AUTH_USER: ${SONGBOOK_AUTH_USER:-}
-      SONGBOOK_AUTH_PASSWORD_HASH: ${SONGBOOK_AUTH_PASSWORD_HASH:-}
+      TUNEALONG_OEMBED_URL: ${TUNEALONG_OEMBED_URL-https://www.youtube.com/oembed}
+      TUNEALONG_BASE_PATH: ${TUNEALONG_BASE_PATH:-}
+      TUNEALONG_AUTH_USER: ${TUNEALONG_AUTH_USER:-}
+      TUNEALONG_AUTH_PASSWORD_HASH: ${TUNEALONG_AUTH_PASSWORD_HASH:-}
     ports:
-      - "${SONGBOOK_BIND:-0.0.0.0}:${SONGBOOK_PORT:-8080}:8080"
+      - "${TUNEALONG_BIND:-0.0.0.0}:${TUNEALONG_PORT:-8080}:8080"
     healthcheck:
-      test: ["CMD", "python", "-m", "songbook.healthcheck", "api"]
+      test: ["CMD", "python", "-m", "tunealong.healthcheck", "api"]
       interval: 30s
       timeout: 5s
       start_period: 20s
       retries: 3
 
   worker:
-    <<: *songbook
+    <<: *tunealong
     command: ["worker"]
     environment:
       <<: *ids
       METUBE_URL: ${METUBE_URL:-http://metube:8081}
-      SONGBOOK_CACHE_MAX_GB: ${SONGBOOK_CACHE_MAX_GB:-20}
-      SONGBOOK_DOWNLOAD_TIMEOUT_S: ${SONGBOOK_DOWNLOAD_TIMEOUT_S:-900}
-      SONGBOOK_SCAN_INTERVAL_S: ${SONGBOOK_SCAN_INTERVAL_S:-300}
-      SONGBOOK_AUDIODB_URL: ${SONGBOOK_AUDIODB_URL-https://www.theaudiodb.com/api/v1/json/123}
+      TUNEALONG_CACHE_MAX_GB: ${TUNEALONG_CACHE_MAX_GB:-20}
+      TUNEALONG_DOWNLOAD_TIMEOUT_S: ${TUNEALONG_DOWNLOAD_TIMEOUT_S:-900}
+      TUNEALONG_SCAN_INTERVAL_S: ${TUNEALONG_SCAN_INTERVAL_S:-300}
+      TUNEALONG_AUDIODB_URL: ${TUNEALONG_AUDIODB_URL-https://www.theaudiodb.com/api/v1/json/123}
     depends_on:
       api:
         condition: service_healthy   # the api creates the data dirs and applies migrations
     healthcheck:
-      test: ["CMD", "python", "-m", "songbook.healthcheck", "worker"]
+      test: ["CMD", "python", "-m", "tunealong.healthcheck", "worker"]
       interval: 30s
       timeout: 5s
       start_period: 20s
@@ -67,8 +67,8 @@ services:
       OUTPUT_TEMPLATE: "%(id)s.%(ext)s"
       YTDL_OPTIONS: '{"writeinfojson": true, "merge_output_format": "mp4"}'
     volumes:
-      - ${SONGBOOK_DATA:-./data}/originals:/downloads
-      - ${SONGBOOK_DATA:-./data}/metube-state:/state
+      - ${TUNEALONG_DATA:-./data}/originals:/downloads
+      - ${TUNEALONG_DATA:-./data}/metube-state:/state
     # No ports: only the worker talks to MeTube. To use its own UI too, see
     # compose.metube-ui.yml in the README.
     healthcheck:

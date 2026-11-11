@@ -1,4 +1,4 @@
-"""CLI: python -m songbook.import_legacy <dir> [--dry-run]"""
+"""CLI: python -m tunealong.import_legacy <dir> [--dry-run]"""
 
 import argparse
 import sys
@@ -8,7 +8,7 @@ from . import config, db, importer
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="python -m songbook.import_legacy", description=__doc__)
+    ap = argparse.ArgumentParser(prog="python -m tunealong.import_legacy", description=__doc__)
     ap.add_argument("dir", type=Path, help="folder of existing MeTube downloads (top level only)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan without touching anything")
     args = ap.parse_args(argv)

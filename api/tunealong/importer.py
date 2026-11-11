@@ -34,7 +34,7 @@ class Action:
     youtube_id: str | None = None
     artist: str | None = None
     title: str | None = None
-    dest: str | None = None   # relative to SONGBOOK_ROOT
+    dest: str | None = None   # relative to TUNEALONG_ROOT
     sha256: str | None = None
     note: str = ""
 

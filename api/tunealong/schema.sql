@@ -19,7 +19,7 @@ CREATE TABLE songs (
   yt_title TEXT,                 -- original YouTube title, reference only
   uploader TEXT,                 -- YouTube channel, reference only
   sort_order INTEGER,            -- manual order within its group
-  original_path TEXT,            -- relative to SONGBOOK_ROOT
+  original_path TEXT,            -- relative to TUNEALONG_ROOT
   original_sha256 TEXT UNIQUE,
   status TEXT NOT NULL CHECK (status IN ('queued', 'downloading', 'ready', 'error')),
   error TEXT,
@@ -67,7 +67,7 @@ CREATE TABLE renders (
   id INTEGER PRIMARY KEY,
   song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,  -- files removed by the delete handler
   cache_key TEXT NOT NULL,
-  path TEXT NOT NULL,            -- relative to SONGBOOK_ROOT
+  path TEXT NOT NULL,            -- relative to TUNEALONG_ROOT
   bytes INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_used_at TEXT,

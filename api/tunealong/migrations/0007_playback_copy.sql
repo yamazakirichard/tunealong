@@ -6,5 +6,5 @@
 ALTER TABLE songs ADD COLUMN playback_path TEXT;
 ALTER TABLE songs ADD COLUMN playback_state TEXT NOT NULL DEFAULT 'pending'
   CHECK (playback_state IN ('pending', 'done', 'error', 'skip'));
--- Only new songs convert by themselves. `python -m songbook.playback queue` does older ones.
+-- Only new songs convert by themselves. `python -m tunealong.playback queue` does older ones.
 UPDATE songs SET playback_state = 'skip';

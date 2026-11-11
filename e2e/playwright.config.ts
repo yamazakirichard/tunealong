@@ -32,7 +32,7 @@ export default defineConfig({
     },
   ],
   webServer: external ? undefined : {
-    command: `${python} ../scripts/dev_stack.py --port ${port} --root /tmp/songbook-e2e`,
+    command: `${python} ../scripts/dev_stack.py --port ${port} --root /tmp/tunealong-e2e`,
     url: `http://127.0.0.1:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,

@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from songbook import db, ingest, playback, render
-from songbook.media import sha256_file
-from songbook.worker import Worker
+from tunealong import db, ingest, playback, render
+from tunealong.media import sha256_file
+from tunealong.worker import Worker
 
 pytestmark = pytest.mark.skipif(shutil.which("rubberband") is None, reason="rubberband not installed")
 
@@ -161,7 +161,7 @@ def test_existing_songs_are_left_alone_until_queued(settings, tmp_path, monkeypa
     conn.executemany("INSERT OR IGNORE INTO schema_version (version) VALUES (?)", [(i + 1,) for i in range(len(scripts))])
     sid = conn.execute("SELECT id FROM songs WHERE youtube_id = 'EEEEEEEEEEE'").fetchone()[0]
     conn.close()
-    monkeypatch.setenv("SONGBOOK_ROOT", str(settings.root))
+    monkeypatch.setenv("TUNEALONG_ROOT", str(settings.root))
     assert playback.main(["queue", str(sid)]) == 0
     assert "1 song(s) queued" in capsys.readouterr().out
     check = db.connect(settings.db_path)

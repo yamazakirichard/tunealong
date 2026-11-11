@@ -1,6 +1,6 @@
 import pytest
 
-from songbook.guess import clean, guess
+from tunealong.guess import clean, guess
 
 
 @pytest.mark.parametrize("yt_title, uploader, known, artist, title", [

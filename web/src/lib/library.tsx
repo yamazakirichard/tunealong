@@ -31,5 +31,5 @@ export function useLibrary(): LibraryCtx {
   return ctx;
 }
 
-export const SONG_MIME = "application/x-songbook-song";
-export const GROUP_MIME = "application/x-songbook-group";
+export const SONG_MIME = "application/x-tunealong-song";
+export const GROUP_MIME = "application/x-tunealong-group";

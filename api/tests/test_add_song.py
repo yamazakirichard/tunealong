@@ -2,8 +2,8 @@ import dataclasses
 
 import pytest
 
-from songbook import jobs
-from songbook.worker import MAX_ATTEMPTS, Worker
+from tunealong import jobs
+from tunealong.worker import MAX_ATTEMPTS, Worker
 
 from .conftest import FIXTURES
 from .fake_metube import FakeMetube, Server

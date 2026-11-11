@@ -12,7 +12,7 @@ test.describe.configure({ mode: "serial" });
 
 test("the UI loads", async ({ page, request }) => {
   await page.goto("./");
-  await expect(page.getByRole("heading", { name: "Songbook" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "TuneAlong" })).toBeVisible();
   expect((await request.get("api/health")).ok()).toBeTruthy();
 });
 

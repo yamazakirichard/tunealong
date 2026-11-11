@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from songbook import ingest
+from tunealong import ingest
 
 pytestmark = pytest.mark.skipif(not shutil.which("ffmpeg"), reason="needs ffmpeg")
 
@@ -33,7 +33,7 @@ def test_recording_becomes_a_seekable_local_song(client, conn, settings, tmp_pat
     (tmp_path / "raw.webm").write_bytes(raw)
     assert duration(tmp_path / "raw.webm") in ("", "N/A")  # what the browser would get without the remux
 
-    r = upload(client, raw, artist="Songbook Fixtures", title="Take 1")
+    r = upload(client, raw, artist="TuneAlong Fixtures", title="Take 1")
     assert r.status_code == 201, r.text
     song = r.json()["song"]
     assert (song["kind"], song["status"], song["title"], song["youtube_id"]) == ("media", "ready", "Take 1", None)

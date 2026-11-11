@@ -1,6 +1,6 @@
 import pytest
 
-from songbook.youtube import parse_id
+from tunealong.youtube import parse_id
 
 ID = "E0ozmU9cJDg"
 

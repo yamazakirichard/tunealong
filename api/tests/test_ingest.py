@@ -1,8 +1,8 @@
 import json
 import shutil
 
-from songbook import ingest
-from songbook.media import sha256_file
+from tunealong import ingest
+from tunealong.media import sha256_file
 
 
 def songs(conn):

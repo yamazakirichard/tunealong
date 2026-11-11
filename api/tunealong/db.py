@@ -8,7 +8,7 @@ import sqlite3
 from importlib import resources
 from pathlib import Path
 
-_PKG = resources.files("songbook")
+_PKG = resources.files("tunealong")
 
 
 def migrations() -> list[str]:

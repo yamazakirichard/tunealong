@@ -101,7 +101,7 @@ function TempoField({ tempo, onCommit }: { tempo: number; onCommit: (t: number) 
 
 declare global {
   interface Window {
-    __songbook?: Record<string, unknown>;
+    __tunealong?: Record<string, unknown>;
   }
 }
 
@@ -276,7 +276,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
       graphRef.current = null;
       document.body.style.overflow = prevOverflow;
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-      window.__songbook = { open: false, errors: graphErrors };
+      window.__tunealong = { open: false, errors: graphErrors };
       prevFocus?.focus?.();
     };
   }, [song.id, applyPlayback, toast]);
@@ -627,7 +627,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
 
   useEffect(() => {
     const v = videoRef.current;
-    window.__songbook = {
+    window.__tunealong = {
       open: true,
       songId: song.id,
       get pitch() {

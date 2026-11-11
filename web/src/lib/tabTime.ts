@@ -1,6 +1,6 @@
 // alphaTab's synth reports and seeks in milliseconds of playback time, which
 // playbackSpeed stretches evenly (at speed 0.5 a 4 s song ends at 8000 ms).
-// Songbook keeps positions and loop points on the song's own timeline, the
+// TuneAlong keeps positions and loop points on the song's own timeline, the
 // seconds at speed 1.0, like the original timeline of a video. These convert.
 
 /** Synth milliseconds at `speed` → song seconds. */

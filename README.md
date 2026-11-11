@@ -1,4 +1,4 @@
-# Songbook
+# TuneAlong
 
 A self-hosted library for playing along to songs: downloaded from YouTube,
 recorded from a browser tab, or loaded from Guitar Pro / MusicXML tab files.
@@ -12,7 +12,7 @@ recorded from a browser tab, or loaded from Guitar Pro / MusicXML tab files.
   is retimed, never re-encoded) and cached, so next time they play instantly
   at full quality. While you experiment, a lighter live preview plays.
 - Paste a YouTube URL to add a song. Artist and title are guessed from the
-  video's YouTube title (`SONGBOOK_OEMBED_URL=` turns that off). The same video
+  video's YouTube title (`TUNEALONG_OEMBED_URL=` turns that off). The same video
   is never downloaded twice.
 - Add tab files too (Guitar Pro or MusicXML). They play in the browser with
   [alphaTab](https://github.com/CoderLine/alphaTab): the tab scrolls with a
@@ -22,7 +22,7 @@ recorded from a browser tab, or loaded from Guitar Pro / MusicXML tab files.
   you start playback there yourself, then press Stop.
 - Each artist's picture is shown beside their name. The worker looks every
   artist up once on [TheAudioDB](https://www.theaudiodb.com) and keeps the
-  picture in `data/artist-images/` (`SONGBOOK_AUDIODB_URL=` turns that off).
+  picture in `data/artist-images/` (`TUNEALONG_AUDIODB_URL=` turns that off).
 
 It runs as three containers: `api` (web UI and API on one port), `worker`
 (downloads, renders, library scans) and a bundled
@@ -36,12 +36,12 @@ docker compose up -d
 ```
 
 Open <http://localhost:8080>. The first `up` builds the image, which takes a
-few minutes. Everything is stored in `./data` (set `SONGBOOK_DATA` to change
+few minutes. Everything is stored in `./data` (set `TUNEALONG_DATA` to change
 it):
 
 ```
 data/
-├── songbook.sqlite        the library: songs, artists, categories, presets
+├── tunealong.sqlite        the library: songs, artists, categories, presets
 ├── originals/             downloaded and imported media (MeTube writes here)
 ├── playback/              H.264 copies of originals in other codecs: rebuildable
 ├── renders/               pitch/tempo renders: a disposable cache
@@ -58,7 +58,7 @@ your environment, they're the ones used.
 > a Web Audio worklet, which browsers only allow in a secure context. On plain
 > `http://<server-ip>:8080` the player still works, but it shows "live pitch
 > unavailable": saved presets play shifted from their cached renders, and only
-> tempo changes live. Put Songbook behind HTTPS (see below) to get live pitch
+> tempo changes live. Put TuneAlong behind HTTPS (see below) to get live pitch
 > from other devices.
 
 ## Importing your existing MeTube downloads
@@ -69,11 +69,11 @@ If you already have a folder of MeTube downloads with arbitrary names
 ```sh
 # 1. See what would happen. Nothing is changed:
 docker compose run --rm -v /path/to/old/downloads:/import:ro api \
-  python -m songbook.import_legacy /import --dry-run
+  python -m tunealong.import_legacy /import --dry-run
 
 # 2. Then for real:
 docker compose run --rm -v /path/to/old/downloads:/import:ro api \
-  python -m songbook.import_legacy /import
+  python -m tunealong.import_legacy /import
 ```
 
 - A file with an `[id]` suffix becomes a YouTube song, so adding that URL later
@@ -103,7 +103,7 @@ adding. The same file can't be added twice.
 - Pitch moves in whole semitones for tabs. Tempo, volume (up to 200%), A/B
   loops and presets work exactly as for videos. Nothing is rendered: alphaTab's
   built-in synthesizer plays the notes live, so there's no "rendering…" wait.
-- Uploads are limited to `SONGBOOK_TAB_MAX_MB` (default 10).
+- Uploads are limited to `TUNEALONG_TAB_MAX_MB` (default 10).
 
 ## Recording a browser tab
 
@@ -118,8 +118,8 @@ In **Add song**, pick **Record a tab** (Chrome or Edge, over HTTPS):
 The recording becomes a local video song. The server remuxes it with ffmpeg
 (streams copied, not re-encoded) so it can be seeked, and from then on it
 works like any other song: Rubber Band presets, loops, volume. Recordings go to
-`data/originals/local/`, up to `SONGBOOK_RECORDING_MAX_MB` (default 1024).
-Songbook only receives what the browser's screen sharing gives it. It never
+`data/originals/local/`, up to `TUNEALONG_RECORDING_MAX_MB` (default 1024).
+TuneAlong only receives what the browser's screen sharing gives it. It never
 opens, controls or reads the other tab. What you record is up to you, and so
 is following that site's terms.
 
@@ -134,20 +134,20 @@ browser can decode the original. Songs already in the library when this arrived
 are left as they are. To convert them, run this in the worker container:
 
 ```
-python -m songbook.playback queue <song id>   # or: queue all
+python -m tunealong.playback queue <song id>   # or: queue all
 ```
 
 ## Backups
 
-Back up `data/originals/`, `data/songbook.sqlite` and `data/artist-images/`
+Back up `data/originals/`, `data/tunealong.sqlite` and `data/artist-images/`
 (small; the database records which artists already have one). **Leave out
 `data/renders/`**: it's a cache that rebuilds itself as songs are played. You
-can also leave out `data/playback/`: `python -m songbook.playback queue all`
+can also leave out `data/playback/`: `python -m tunealong.playback queue all`
 remakes it from the originals.
 For a consistent copy of the database while the app is running, use
-`sqlite3 data/songbook.sqlite ".backup songbook-backup.sqlite"`.
+`sqlite3 data/tunealong.sqlite ".backup tunealong-backup.sqlite"`.
 
-The render cache is kept under `SONGBOOK_CACHE_MAX_GB` (default 20). The worker
+The render cache is kept under `TUNEALONG_CACHE_MAX_GB` (default 20). The worker
 checks every hour and removes the least-used renders first.
 
 ## Optional built-in login
@@ -163,34 +163,34 @@ docker compose run --rm api python -c \
 Put the hash in `.env` with **every `$` doubled**, or Compose will mangle it:
 
 ```
-SONGBOOK_AUTH_USER=me
-SONGBOOK_AUTH_PASSWORD_HASH=$$2b$$12$$…
+TUNEALONG_AUTH_USER=me
+TUNEALONG_AUTH_PASSWORD_HASH=$$2b$$12$$…
 ```
 
 ## Running behind a reverse proxy
 
-Songbook serves everything (UI, API, media) on one port, so any reverse proxy
+TuneAlong serves everything (UI, API, media) on one port, so any reverse proxy
 works. A few things matter:
 
 - **Forward the `Range` header and don't buffer media responses.** Seeking in
   the player relies on HTTP range requests.
-- **Subpath:** to serve under `https://example.com/songbook/`, set
-  `SONGBOOK_BASE_PATH=/songbook` and have the proxy pass the path through
+- **Subpath:** to serve under `https://example.com/tunealong/`, set
+  `TUNEALONG_BASE_PATH=/tunealong` and have the proxy pass the path through
   unchanged. No rebuild is needed.
-- Set `SONGBOOK_BIND=127.0.0.1` if the proxy runs on the same host, so port
+- Set `TUNEALONG_BIND=127.0.0.1` if the proxy runs on the same host, so port
   8080 isn't reachable directly.
 
 One-line examples, for a root domain:
 
 ```
 # Caddy
-songbook.example.com { reverse_proxy localhost:8080 }
+tunealong.example.com { reverse_proxy localhost:8080 }
 
 # nginx (inside a server block)
 location / { proxy_pass http://127.0.0.1:8080; proxy_buffering off; proxy_set_header Range $http_range; proxy_set_header If-Range $http_if_range; }
 
 # Traefik (labels on the api service)
-traefik.http.routers.songbook.rule=Host(`songbook.example.com`)
+traefik.http.routers.tunealong.rule=Host(`tunealong.example.com`)
 ```
 
 ## Using an existing MeTube
@@ -199,14 +199,14 @@ To use a MeTube you already run instead of the bundled one:
 
 1. Set `METUBE_URL` in `.env` to its address, as reachable from the worker
    container (for example `http://metube:8081` on a shared Docker network).
-2. Mount the same download folder as Songbook's `originals/`: MeTube's
-   download directory and `SONGBOOK_DATA/originals` must be the same place.
+2. Mount the same download folder as TuneAlong's `originals/`: MeTube's
+   download directory and `TUNEALONG_DATA/originals` must be the same place.
 3. Configure that MeTube with:
    ```
    OUTPUT_TEMPLATE=%(id)s.%(ext)s
    YTDL_OPTIONS={"writeinfojson": true, "merge_output_format": "mp4"}
    ```
-   **Don't enable `download_archive`.** Songbook does its own dedup, and an
+   **Don't enable `download_archive`.** TuneAlong does its own dedup, and an
    archive would silently block re-downloading a song you deleted.
 4. Remove or scale down the bundled `metube` service, for example with
    `docker compose up -d api worker`.
@@ -234,7 +234,7 @@ network: downloads go to a fake MeTube.
 How the components fit together is described in
 [ARCHITECTURE.md](ARCHITECTURE.md). Design decisions are recorded in
 [DECISIONS.md](DECISIONS.md), and the original plan is in
-[plan/songbook-PLAN.md](plan/songbook-PLAN.md).
+[plan/tunealong-PLAN.md](plan/tunealong-PLAN.md).
 
 ## Credits
 

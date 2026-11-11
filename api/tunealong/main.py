@@ -1,4 +1,4 @@
-"""FastAPI app. Run with `uvicorn --factory songbook.main:create_app`, so
+"""FastAPI app. Run with `uvicorn --factory tunealong.main:create_app`, so
 nothing touches the filesystem at import time."""
 
 from contextlib import asynccontextmanager
@@ -19,7 +19,7 @@ def create_app(settings: config.Settings | None = None):
     app = _build(settings)
     outer = app
     if settings.base_path:
-        # SONGBOOK_BASE_PATH is read at runtime: the same image (and the same
+        # TUNEALONG_BASE_PATH is read at runtime: the same image (and the same
         # relative-URL UI build) serves at / or under a subpath.
         base = settings.base_path
 
@@ -47,7 +47,7 @@ def _build(settings: config.Settings) -> FastAPI:
         finally:
             app.state.db.close()
 
-    app = FastAPI(title="Songbook", lifespan=lifespan)
+    app = FastAPI(title="TuneAlong", lifespan=lifespan)
     app.state.settings = settings
 
     @app.get("/api/health")

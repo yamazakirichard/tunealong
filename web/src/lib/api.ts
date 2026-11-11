@@ -1,4 +1,4 @@
-// Thin client for the Songbook API. Every URL is relative ("api/…", "media/…")
+// Thin client for the TuneAlong API. Every URL is relative ("api/…", "media/…")
 // so the UI works at / or under any subpath.
 
 export interface Preset {

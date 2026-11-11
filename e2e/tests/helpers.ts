@@ -34,7 +34,7 @@ export async function createArtist(request: APIRequestContext, name: string, ext
 /** The player's test hook, snapshotted (getters evaluated in the page). */
 export async function sb(page: Page): Promise<Record<string, any>> {
   return page.evaluate(() => {
-    const h = (window as any).__songbook ?? {};
+    const h = (window as any).__tunealong ?? {};
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(h)) out[k] = h[k];
     return out;

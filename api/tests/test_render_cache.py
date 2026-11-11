@@ -3,8 +3,8 @@ these run without rubberband; test_render.py covers the real pipeline."""
 
 import pytest
 
-from songbook import cache, ingest, render
-from songbook.worker import Worker
+from tunealong import cache, ingest, render
+from tunealong.worker import Worker
 
 
 @pytest.fixture

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Songbook image.
+# TuneAlong image.
 #   web      Node build of web/ (vitest runs here too); output in /web/dist
 #   runtime  Python + ffmpeg + rubberband, the base of `app` and `test`
 #   test     the backend suite with real ffmpeg/rubberband (`make test-docker`)
@@ -25,21 +25,21 @@ RUN apt-get update \
  && rubberband --version && ffmpeg -version | head -1
 WORKDIR /app
 COPY api/pyproject.toml api/pyproject.toml
-COPY api/songbook api/songbook
+COPY api/tunealong api/tunealong
 RUN pip install --no-cache-dir ./api
 
 FROM runtime AS app
 COPY --from=web /web/dist /app/web/dist
-COPY docker/entrypoint.sh /usr/local/bin/songbook-entrypoint
-ENV SONGBOOK_ROOT=/data \
-    SONGBOOK_WEB_DIR=/app/web/dist \
-    SONGBOOK_HEARTBEAT=/tmp/songbook-worker.heartbeat \
+COPY docker/entrypoint.sh /usr/local/bin/tunealong-entrypoint
+ENV TUNEALONG_ROOT=/data \
+    TUNEALONG_WEB_DIR=/app/web/dist \
+    TUNEALONG_HEARTBEAT=/tmp/tunealong-worker.heartbeat \
     PYTHONUNBUFFERED=1
 RUN rubberband --version && ffmpeg -version >/dev/null && setpriv --version
 EXPOSE 8080
 VOLUME ["/data"]
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["python", "-m", "songbook.healthcheck", "api"]
-ENTRYPOINT ["songbook-entrypoint"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["python", "-m", "tunealong.healthcheck", "api"]
+ENTRYPOINT ["tunealong-entrypoint"]
 CMD ["api"]
 
 FROM runtime AS test
@@ -55,7 +55,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY api/pyproject.toml api/pyproject.toml
-COPY api/songbook api/songbook
+COPY api/tunealong api/tunealong
 RUN python3 -m venv /venv && /venv/bin/pip install --no-cache-dir ./api
 COPY e2e/package.json e2e/package-lock.json e2e/
 RUN cd e2e && npm ci --no-audit --no-fund

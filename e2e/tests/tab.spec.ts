@@ -20,7 +20,7 @@ async function uploadScale(page: Page) {
   await page.locator("input[name=tab-file]").setInputFiles(SCALE);
   // Artist and title come from the file's own metadata.
   await expect(page.locator("input[name=title]")).toHaveValue(TITLE);
-  await expect(page.locator("input[name=artist]")).toHaveValue("Songbook Fixtures");
+  await expect(page.locator("input[name=artist]")).toHaveValue("TuneAlong Fixtures");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(card(page, TITLE)).toBeVisible();
 }

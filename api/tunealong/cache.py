@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from . import config, db
 
-    ap = argparse.ArgumentParser(prog="python -m songbook.cache")
+    ap = argparse.ArgumentParser(prog="python -m tunealong.cache")
     sub = ap.add_subparsers(dest="cmd", required=True)
     g = sub.add_parser("gc", help="evict renders until the cache fits the budget")
     g.add_argument("--max-gb", type=float, required=True)

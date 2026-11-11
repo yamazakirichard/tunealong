@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Static Gate 7 checks over Songbook/ (tracked and new files, not ignored ones):
+"""Static Gate 7 checks over TuneAlong/ (tracked and new files, not ignored ones):
 
 1. No hardcoded hostnames or IPs: outside docs, every domain found must be on
    a small allowlist (YouTube hosts the URL parser accepts, project and licence
    URLs in comments). Anywhere, docs included, no private-network names
    (*.local, *.lan, *.home, *.internal) and no private IPs.
-2. Nothing references a path outside Songbook/: no symlinks, and every
+2. Nothing references a path outside TuneAlong/: no symlinks, and every
    relative "../" path in a file resolves inside the project.
 
 Exits non-zero on any finding.
@@ -21,10 +21,10 @@ DOCS = {"README.md", "NOTICE", "DECISIONS.md", "ARCHITECTURE.md", "LICENSE", ".e
 SKIP_SUFFIX = {".png", ".jpg", ".webm", ".mp4", ".mkv", ".mp3", ".m4a", ".sqlite"}
 SKIP_NAMES = {"package-lock.json", "favicon.svg"}  # favicon: its only URL is the SVG xmlns
 ALLOWED_DOMAINS = {
-    # parsed or produced by songbook/youtube.py and songbook/metube.py
+    # parsed or produced by tunealong/youtube.py and tunealong/metube.py
     "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
     "youtube-nocookie.com", "www.youtube-nocookie.com", "notyoutube.com", "vimeo.com",  # last two: test negatives
-    # artist pictures (songbook/config.py)
+    # artist pictures (tunealong/config.py)
     "www.theaudiodb.com",
     # credits and references in comments
     "github.com", "registry.npmjs.org", "mcr.microsoft.com", "ghcr.io", "fsf.org", "gnu.org", "www.gnu.org",
@@ -69,7 +69,7 @@ def main() -> int:
             for m in RELPATH.findall(line):
                 target = (f.parent / m).resolve()
                 if not target.is_relative_to(ROOT):
-                    problems.append(f"path outside Songbook/: {rel}:{n}: {m}")
+                    problems.append(f"path outside TuneAlong/: {rel}:{n}: {m}")
     for p in problems:
         print(p)
     print(f"{len(problems)} problem(s) in {ROOT.name}/")

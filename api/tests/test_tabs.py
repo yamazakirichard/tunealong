@@ -2,9 +2,9 @@
 
 import dataclasses
 
-from songbook import db, ingest
-from songbook.deps import get_settings
-from songbook.media import sha256_file
+from tunealong import db, ingest
+from tunealong.deps import get_settings
+from tunealong.media import sha256_file
 
 from .conftest import FIXTURES
 
@@ -18,7 +18,7 @@ def upload(client, name="scale.musicxml", content=None, **form):
 
 
 def test_upload_creates_a_ready_tab_song(client, settings):
-    r = upload(client, artist="Songbook Fixtures", title="Scale")
+    r = upload(client, artist="TuneAlong Fixtures", title="Scale")
     assert r.status_code == 201, r.text
     song = r.json()["song"]
     assert (song["kind"], song["status"], song["title"], song["tab_track"]) == ("tab", "ready", "Scale", None)

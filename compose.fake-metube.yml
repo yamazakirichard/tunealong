@@ -5,12 +5,12 @@
 services:
   api:
     environment:
-      SONGBOOK_OEMBED_URL: http://metube:8081/oembed
+      TUNEALONG_OEMBED_URL: http://metube:8081/oembed
   worker:
     environment:
-      SONGBOOK_AUDIODB_URL: http://metube:8081/audiodb
+      TUNEALONG_AUDIODB_URL: http://metube:8081/audiodb
   metube:
-    image: songbook:test
+    image: tunealong:test
     build:
       context: .
       target: test
@@ -19,7 +19,7 @@ services:
     working_dir: /app/api
     user: "${PUID:-1000}:${PGID:-1000}"
     volumes: !override
-      - ${SONGBOOK_DATA:-./data}/originals:/downloads
+      - ${TUNEALONG_DATA:-./data}/originals:/downloads
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/history', timeout=3)"]
       interval: 5s

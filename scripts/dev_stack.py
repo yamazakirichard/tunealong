@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Dev and e2e stack in one process: the API (serving web/dist), the worker and
-a fake MeTube, over a scratch SONGBOOK_ROOT seeded with the webm fixtures.
+a fake MeTube, over a scratch TUNEALONG_ROOT seeded with the webm fixtures.
 
     python scripts/dev_stack.py [--port 8080] [--root DIR]
 
@@ -28,12 +28,12 @@ import uvicorn  # noqa: E402
 from starlette.responses import JSONResponse  # noqa: E402
 from starlette.routing import Route  # noqa: E402
 
-from songbook import config, db, ingest  # noqa: E402
-from songbook.main import create_app  # noqa: E402
-from songbook.worker import Worker  # noqa: E402
+from tunealong import config, db, ingest  # noqa: E402
+from tunealong.main import create_app  # noqa: E402
+from tunealong.worker import Worker  # noqa: E402
 from tests.fake_metube import FakeMetube, Server  # noqa: E402
 
-MARKER = ".songbook-dev-root"
+MARKER = ".tunealong-dev-root"
 SEED = ("AAAAAAAAAAA.webm", "BBBBBBBBBBB.webm")  # webm only: Chromium can't play the mp4 fixture
 
 
@@ -57,13 +57,13 @@ def main() -> None:
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    root = (args.root or Path(tempfile.mkdtemp(prefix="songbook-dev-"))).resolve()
+    root = (args.root or Path(tempfile.mkdtemp(prefix="tunealong-dev-"))).resolve()
     if root.exists() and any(root.iterdir()) and not (root / MARKER).exists():
         sys.exit(f"refusing to wipe {root}: it has files but no {MARKER} marker (not a dev root)")
     shutil.rmtree(root, ignore_errors=True)
     root.mkdir(parents=True)
     (root / MARKER).write_text("scratch root of scripts/dev_stack.py; wiped on every start\n")
-    os.environ["SONGBOOK_ROOT"] = str(root)
+    os.environ["TUNEALONG_ROOT"] = str(root)
     settings = config.load()
     config.ensure_dirs(settings)
     conn = db.open_db(settings.db_path)
@@ -103,7 +103,7 @@ def main() -> None:
     # Before the static-files mount at "/", which would otherwise answer first.
     app.router.routes[:0] = [Route("/__dev/reset", reset, methods=["POST"]), Route("/__dev/calls", calls)]
 
-    print(f"songbook dev stack: http://127.0.0.1:{args.port}  root={root}  fake MeTube={metube.url}", flush=True)
+    print(f"tunealong dev stack: http://127.0.0.1:{args.port}  root={root}  fake MeTube={metube.url}", flush=True)
     if not (web_dir / "index.html").is_file():
         print("note: web/dist is missing, so only the API is served (run `make build`)", flush=True)
     uvicorn.run(app, host=os.environ.get("HOST", "127.0.0.1"), port=args.port, log_level="warning")

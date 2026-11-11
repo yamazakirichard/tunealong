@@ -1,7 +1,7 @@
 // Record another browser tab (picture and sound) into a WebM, for Add song.
 //
 // The user picks the tab in the browser's share dialog, starts playback there
-// themselves, and comes back to press Stop. Songbook never touches the other
+// themselves, and comes back to press Stop. TuneAlong never touches the other
 // tab: it only receives what the browser's own screen sharing gives it.
 // Tab audio needs Chrome or Edge, with "Also share tab audio" ticked.
 
@@ -48,7 +48,7 @@ export class TabRecorder {
         video: { frameRate: 30 },
         // Keep the tab's own sound as it is: these processing steps are for voices.
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        // Chrome: offer tabs first, keep audio sharing on, and don't offer Songbook's own tab.
+        // Chrome: offer tabs first, keep audio sharing on, and don't offer TuneAlong's own tab.
         ...({ preferCurrentTab: false, selfBrowserSurface: "exclude", systemAudio: "include", surfaceSwitching: "exclude" } as object),
       } as DisplayMediaStreamOptions);
     } catch (e) {

@@ -24,7 +24,7 @@ export default function Toolbar(props: {
   const btn = "flex items-center gap-1 rounded-md px-2 py-1 text-sm text-theme-800 dark:text-theme-200 hover:bg-theme-300/20";
   return (
     <header className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <h1 className="text-2xl font-semibold text-theme-800 dark:text-theme-200 mr-2">Songbook</h1>
+      <h1 className="text-2xl font-semibold text-theme-800 dark:text-theme-200 mr-2">TuneAlong</h1>
       <QuickSearch value={props.q} onChange={props.setQ} onOpenFirst={props.onOpenFirst} />
       <div className="flex rounded-md overflow-hidden border border-theme-400/50 text-sm" role="group" aria-label="Group by">
         {(["artist", "category"] as const).map((g) => (

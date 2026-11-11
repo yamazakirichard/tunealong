@@ -3,9 +3,9 @@ import dataclasses
 import pytest
 from fastapi.testclient import TestClient
 
-from songbook import artist_images
-from songbook.main import create_app
-from songbook.worker import Worker
+from tunealong import artist_images
+from tunealong.main import create_app
+from tunealong.worker import Worker
 
 from .conftest import FIXTURES
 from .fake_metube import FakeMetube, Server

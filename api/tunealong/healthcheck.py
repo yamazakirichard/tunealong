@@ -1,4 +1,4 @@
-"""Container healthchecks: `python -m songbook.healthcheck api|worker`.
+"""Container healthchecks: `python -m tunealong.healthcheck api|worker`.
 
 api     GET <base path>/api/health on the local port (the DB must answer).
 worker  the heartbeat file was touched recently (a thread beats every 15 s).
@@ -25,7 +25,7 @@ def main(role: str) -> int:
     if role == "worker":
         hb = settings.heartbeat_path
         if hb is None:
-            print("unhealthy: SONGBOOK_HEARTBEAT is not set", file=sys.stderr)
+            print("unhealthy: TUNEALONG_HEARTBEAT is not set", file=sys.stderr)
             return 1
         try:
             age = time.time() - hb.stat().st_mtime
@@ -33,7 +33,7 @@ def main(role: str) -> int:
             print(f"unhealthy: {e}", file=sys.stderr)
             return 1
         return 0 if age < 60 else 1
-    print(f"usage: python -m songbook.healthcheck api|worker (got {role!r})", file=sys.stderr)
+    print(f"usage: python -m tunealong.healthcheck api|worker (got {role!r})", file=sys.stderr)
     return 2
 
 
