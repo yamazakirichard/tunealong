@@ -401,10 +401,27 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
     setPendingFor(null);
     load(ORIGINAL(song.id));
   };
+  /** The song reopens with whatever was picked last: make `id` the default (null = the original). */
+  const rememberChoice = async (id: number | null) => {
+    const current = presets.find((p) => p.is_default)?.id ?? null;
+    if (current === id) return;
+    try {
+      if (id === null) await api.patchPreset(current!, { is_default: false });
+      else await api.patchPreset(id, { is_default: true });
+      setPresets((await api.song(song.id)).presets ?? []);
+      void lib.refresh();
+    } catch (e) {
+      toast({ text: errorText(e), kind: "error" });
+    }
+  };
   const selectPreset = async (id: number | null) => {
-    if (id === null) return resetToOriginal();
+    if (id === null) {
+      resetToOriginal();
+      return rememberChoice(null);
+    }
     const p = presets.find((x) => x.id === id);
     if (!p) return;
+    void rememberChoice(id);
     setPresetId(id);
     setSemitones(p.semitones);
     setTempo(p.tempo);
@@ -841,7 +858,7 @@ export default function Player({ song, onClose }: { song: Song; onClose: () => v
               onClick={() => void save()}
               disabled={!preset}
               aria-label="Save preset"
-              title={preset ? `Save changes to "${preset.name}"${modified ? "" : " (makes it the default)"}` : "Pick a preset to save, or use Save as…"}
+              title={preset ? `Save changes to "${preset.name}"` : "Pick a preset to save, or use Save as…"}
             >
               <MdSave />
               {modified && <span data-testid="unsaved" aria-hidden className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />}

@@ -6,7 +6,7 @@ A self-hosted library for playing along to songs downloaded from YouTube.
   in a style forked from [Homepage](https://github.com/gethomepage/homepage).
 - Click a song and it plays in a near-full-screen player. Close it with ✕ or Esc.
 - Change pitch (semitones) and tempo, and save the settings as named presets.
-  Only the presets you mark as default change how a song opens.
+  A song reopens with the preset you last saved or picked (or the original, if you picked that).
 - Saved presets are rendered once with Rubber Band (pitch and tempo; the video
   is retimed, never re-encoded) and cached, so next time they play instantly
   at full quality. While you experiment, a lighter live preview plays.

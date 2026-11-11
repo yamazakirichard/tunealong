@@ -118,7 +118,7 @@ test("+2 saved as default: rendering… → cached, src switches to the render, 
   expect(await jobs(request, "render")).toHaveLength(1);
 });
 
-test("the most recently saved preset is what the song opens with; 'Open at original' undoes that", async ({ page, request }) => {
+test("the most recently saved or picked preset is what the song opens with; 'Open at original' undoes that", async ({ page, request }) => {
   await page.goto("./");
   const id = await songId(request, A);
   await openSong(page, A);
@@ -143,10 +143,9 @@ test("the most recently saved preset is what the song opens with; 'Open at origi
   await expect(page.getByTestId("render-badge")).toHaveText("cached");
   expect((await sb(page)).semitones).toBe(-1);
 
-  // Re-saving an older preset makes it the default again.
+  // Picking an older preset makes it the default again, with no save.
   await page.getByLabel("Preset", { exact: true }).selectOption({ label: "Up two" });
   await expect(page.getByTestId("unsaved")).toBeHidden();
-  await page.getByRole("button", { name: "Save preset" }).click();
   await expect.poll(async () => (await presets(request, id)).find((p: { is_default: boolean }) => p.is_default)?.name).toBe("Up two");
 
   // Save updates the selected preset in place, with no dialog; nothing new is added.
@@ -167,6 +166,33 @@ test("the most recently saved preset is what the song opens with; 'Open at origi
   const s = await sb(page);
   expect([s.pitch, s.playbackRate, s.badge, s.presetName]).toEqual([0, 1, "original", null]);
   expect(s.src).toContain(`/media/originals/${id}`);
+});
+
+test("the song reopens with the preset last picked, or the original if that was picked", async ({ page, request }) => {
+  await page.goto("./");
+  const id = await songId(request, A);
+  await openSong(page, A);
+  await page.getByRole("button", { name: "Pitch up 1" }).click();
+  await saveAs(page, "One");
+  await page.getByRole("button", { name: "Pitch up 1" }).click();
+  await saveAs(page, "Two");
+  const preset = page.getByLabel("Preset", { exact: true });
+  const defaultName = async () => (await presets(request, id)).find((p: { is_default: boolean }) => p.is_default)?.name ?? null;
+
+  await preset.selectOption({ label: "One" });
+  await expect.poll(defaultName).toBe("One");
+  await closePlayer(page);
+  await openSong(page, A);
+  await expect(page.getByTestId("preset-badge")).toHaveText("One");
+  expect((await sb(page)).semitones).toBe(1);
+
+  await preset.selectOption({ label: "(original)" });
+  await expect.poll(defaultName).toBeNull();
+  await closePlayer(page);
+  await openSong(page, A);
+  const s = await sb(page);
+  expect([s.semitones, s.presetName]).toEqual([0, null]);
+  expect((await presets(request, id)).map((p: { name: string }) => p.name)).toEqual(["One", "Two"]); // nothing deleted
 });
 
 test("the trash can deletes the selected preset after a confirm, and playback goes back to the original", async ({ page, request }) => {
@@ -285,7 +311,7 @@ test("a preset keeps its own volume; the original keeps the browser's", async ({
   await expect(slider).toHaveValue("0.4"); // set before the preset existed, so also the browser's
   await slider.fill("0.8");
   await expect.poll(async () => (await sb(page)).gain).toBeCloseTo(0.64, 3);
-  await preset.selectOption({ label: "Quiet (default)" });
+  await preset.selectOption({ label: "Quiet" });
   await expect(slider).toHaveValue("0.4");
   await slider.fill("0.6");
   await expect(page.getByTestId("unsaved")).toBeVisible();
@@ -355,7 +381,7 @@ test("a preset's A/B don't carry over to (original), and come back with the pres
   expect([s.loop_a, s.loop_b, s.loopOn]).toEqual([null, null, false]);
   await expect(page.getByTitle("Set loop start (A)")).toHaveText("A");
 
-  await preset.selectOption({ label: "Solo (default)" });
+  await preset.selectOption({ label: "Solo" });
   s = await sb(page);
   expect([s.loop_a, s.loop_b, s.loopOn]).toEqual([saved.loop_a, saved.loop_b, true]);
 });

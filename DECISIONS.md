@@ -278,3 +278,8 @@ Judgement calls made during implementation, newest last.
 - **`playback/` is not under `renders/`**, because cache GC evicts unreferenced files there first, and these would then be rebuilt from scratch at a high CPU cost.
 - **The player now says so when a video can't be decoded** (`MediaError` code 3 or 4). It used to fail silently, which is what made this look like a network problem.
 
+- **The song opens with the preset last picked, not only the last saved** (owner's request, 2026-11-11). This extends "the most recently saved preset becomes the song's default" above.
+  - Picking a preset in the Preset selector also PATCHes `is_default: true` on it (the API's one-default rule clears the old one). Picking "(original)" clears the default, so the song reopens at its original pitch and tempo. Saving still sets the default, as before.
+  - It's the pick that counts, not pressing Play: the selector is the only way to switch presets, and a picked preset starts playing straight away if the song is already playing.
+  - Deleting a preset still goes back to the original without touching the other presets' default flags.
+  - 💾 Save no longer says "(makes it the default)": picking already does that. "Open at original" stays as a way to clear the default while keeping the current preset loaded.
