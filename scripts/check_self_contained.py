@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = {"README.md", "NOTICE", "DECISIONS.md", "ARCHITECTURE.md", "LICENSE", ".env.example"}
 SKIP_SUFFIX = {".png", ".jpg", ".webm", ".mp4", ".mkv", ".mp3", ".m4a", ".sqlite"}
-SKIP_NAMES = {"package-lock.json"}
+SKIP_NAMES = {"package-lock.json", "favicon.svg"}  # favicon: its only URL is the SVG xmlns
 ALLOWED_DOMAINS = {
     # parsed or produced by songbook/youtube.py and songbook/metube.py
     "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
